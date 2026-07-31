@@ -1,0 +1,5 @@
+/*
+  X-Frame-Options: ALLOW-FROM https://tradexpro.co.ke
+  Content-Security-Policy: frame-ancestors 'self' https://tradexpro.co.ke
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

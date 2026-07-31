@@ -9,6 +9,9 @@ import initStore from 'App/initStore';
 import App from 'App/app.jsx';
 import AppNotificationMessages from './App/Containers/app-notification-messages.jsx';
 import { AnalyticsInitializer } from 'Utils/Analytics';
+import { initTradexproAuthBridge } from './auth/tradexpro-auth-bridge';
+
+initTradexproAuthBridge();
 
 AnalyticsInitializer();
 if (
