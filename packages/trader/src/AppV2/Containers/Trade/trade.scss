@@ -85,6 +85,9 @@
     }
     &__content {
         padding-top: var(--core-spacing-50);
+        max-height: 60vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
     &--is_editing {
         overflow: hidden;
