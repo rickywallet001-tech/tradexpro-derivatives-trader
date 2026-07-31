@@ -1,0 +1,17 @@
+labelPRBasedOnFilePath:
+  Components:
+    - packages/components/**/*
+  Core:
+    - packages/core/**/*
+  Reports:
+    - packages/reports/**/*
+  Shared:
+    - packages/shared/**/*
+  Trader:
+    - packages/trader/**/*
+  Translations:
+    - packages/translations/**/*
+  Docs:
+    - README.md
+    - docs/**/*.md
+    - packages/**/*.md

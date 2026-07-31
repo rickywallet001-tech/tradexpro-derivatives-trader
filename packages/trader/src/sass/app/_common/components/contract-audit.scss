@@ -1,0 +1,164 @@
+/** @define contract-audit; */
+$HEIGHT: calc(100vh - 34em);
+
+.contract-audit {
+    &__wrapper {
+        border-radius: $BORDER_RADIUS;
+        opacity: 1;
+        flex: 1;
+        overflow: hidden;
+        background-color: var(--color-surface-primary);
+        color: var(--color-text-primary);
+        display: flex;
+        margin-bottom: 0.8rem;
+
+        /* postcss-bem-linter: ignore */
+        .dc-tabs {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            /* postcss-bem-linter: ignore */
+            &__content {
+                display: flex;
+                height: calc(100% - 4rem);
+                /* postcss-bem-linter: ignore */
+                .dc-themed-scrollbars {
+                    flex: 1;
+                }
+            }
+        }
+        /* postcss-bem-linter: ignore */
+        .dc-themed-scrollbars {
+            width: 100%;
+        }
+    }
+    &__grid {
+        display: flex;
+        padding: 0.8rem 0;
+
+        &:not(:first-child) {
+            border-top: 1px solid var(--color-surface-border);
+        }
+    }
+    &__icon {
+        display: flex;
+        align-items: flex-start;
+        margin-right: 8px;
+
+        .lookbacks-marker {
+            &__wrapper {
+                height: 2.4rem;
+                width: 2.4rem;
+                border-radius: $BORDER_RADIUS;
+                background-color: var(--color-surface-primary);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            &__asset {
+                height: 1.6rem;
+                width: 1.6rem;
+                border-radius: 50%;
+                background-color: var(--color-text-info);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+        }
+    }
+    &__item {
+        display: flex;
+        flex-direction: column;
+        margin: 0 4px;
+    }
+    &__label {
+        white-space: nowrap;
+        max-width: 90px;
+    }
+    &__value-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
+    &__value,
+    &__value2 {
+        padding-top: 2px;
+    }
+    &__timestamp {
+        align-self: center;
+        margin-left: auto;
+
+        &-value {
+            display: block;
+        }
+    }
+    &__empty {
+        display: flex;
+        height: 100%;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        padding: 16px;
+
+        &-header {
+            font-size: 1.4rem;
+            font-weight: bold;
+            text-align: center;
+            color: var(--color-text-secondary);
+            padding: 8px;
+        }
+    }
+    &__tabs {
+        &-content {
+            padding: 0.8rem 1.6rem;
+            flex: 1;
+
+            @include mobile {
+                overflow-y: auto;
+            }
+        }
+    }
+    &__selected-tick {
+        align-items: center;
+        background-color: var(--color-surface-primary);
+        border-radius: 0.4rem;
+        display: flex;
+        flex-shrink: 0;
+        height: 2.4rem;
+        justify-content: center;
+        padding: 0.4rem;
+        width: 2.4rem;
+
+        &--marker {
+            align-items: center;
+            border-radius: 50%;
+            border: 1px solid var(--brand-black);
+            display: flex;
+            height: 1.6rem;
+            justify-content: center;
+            width: 1.6rem;
+
+            &--won {
+                background-color: var(--color-text-success);
+                border-color: var(--color-text-success);
+                color: var(--brand-white);
+            }
+
+            &--lost {
+                background-color: var(--color-text-danger);
+                border-color: var(--color-text-danger);
+                color: var(--brand-white);
+            }
+        }
+    }
+    &__exit-time {
+        &--success rect {
+            fill: var(--color-text-success);
+        }
+        &--danger rect {
+            fill: var(--color-text-danger);
+        }
+    }
+}

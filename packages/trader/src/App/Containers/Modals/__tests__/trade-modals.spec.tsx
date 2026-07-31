@@ -1,0 +1,89 @@
+import React from 'react';
+
+import { mockStore } from '@deriv/stores';
+import { TCoreStores } from '@deriv/stores/types';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import TraderProviders from '../../../../trader-providers';
+import TradeModals from '../trade-modals';
+
+jest.mock('App/Components/Elements/Modals/ServicesErrorModal', () =>
+    jest.fn(props => (
+        <div>
+            <div>Services error modal</div>
+            <button onClick={props.onConfirm}>onConfirm services</button>
+        </div>
+    ))
+);
+
+window.open = jest.fn();
+
+describe('TradeModals', () => {
+    const mockTradeModals = (mocked_store: TCoreStores) => {
+        return (
+            <TraderProviders store={mocked_store}>
+                <TradeModals />
+            </TraderProviders>
+        );
+    };
+
+    it('should render modal', () => {
+        const mock_root_store = mockStore({
+            modules: {
+                trade: {
+                    resetPreviousSymbol: jest.fn(),
+                    clearPurchaseInfo: jest.fn(),
+                    requestProposal: jest.fn(),
+                },
+            },
+        });
+
+        render(mockTradeModals(mock_root_store));
+
+        expect(screen.getByText('Services error modal')).toBeInTheDocument();
+    });
+    it('should call function servicesErrorModalOnConfirm if button onConfirm in ServicesErrorModal component was clicked', async () => {
+        const mock_root_store = mockStore({
+            modules: {
+                trade: {
+                    resetPreviousSymbol: jest.fn(),
+                    clearPurchaseInfo: jest.fn(),
+                    requestProposal: jest.fn(),
+                },
+            },
+        });
+
+        render(mockTradeModals(mock_root_store));
+        await userEvent.click(screen.getByText('onConfirm services'));
+
+        expect(mock_root_store.ui.toggleServicesErrorModal).toHaveBeenCalled();
+        expect(mock_root_store.modules.trade.clearPurchaseInfo).not.toHaveBeenCalled();
+        expect(mock_root_store.modules.trade.requestProposal).not.toHaveBeenCalled();
+    });
+    it('should call function servicesErrorModalOnConfirm and clearPurchaseInfo and requestProposal if button onConfirm in ServicesErrorModal component was clicked and type of services_error is equal to buy', async () => {
+        const mock_root_store = mockStore({
+            modules: {
+                trade: {
+                    resetPreviousSymbol: jest.fn(),
+                    clearPurchaseInfo: jest.fn(),
+                    requestProposal: jest.fn(),
+                },
+            },
+            common: {
+                services_error: {
+                    code: 'test',
+                    message: 'test',
+                    type: 'buy',
+                },
+            },
+        });
+
+        render(mockTradeModals(mock_root_store));
+        await userEvent.click(screen.getByText('onConfirm services'));
+
+        expect(mock_root_store.ui.toggleServicesErrorModal).toHaveBeenCalled();
+        expect(mock_root_store.modules.trade.clearPurchaseInfo).toHaveBeenCalled();
+        expect(mock_root_store.modules.trade.requestProposal).toHaveBeenCalled();
+    });
+});

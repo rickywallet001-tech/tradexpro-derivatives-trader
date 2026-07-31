@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" dir="auto">
+    <head>
+        <!-- Set skeleton theme color properties -->
+        <style>
+            :root {
+                --color-surface-primary: #fff;
+                --color-text-primary: #000;
+            }
+
+            #platform_name:after {
+                content: var(--app-shell-platform-name);
+                margin-left: 8px;
+            }
+
+            .derivatives-trader > .header__loading {
+                background-color: var(--color-surface-primary);
+                border-bottom: var(--color-surface-primary);
+            }
+
+            .derivatives-trader > .app-contents__loading {
+                background-color: var(--color-surface-primary);
+            }
+
+            .derivatives-trader > .footer__loading {
+                background-color: var(--color-surface-primary);
+                border-bottom: var(--color-surface-primary);
+            }
+
+            .initial-loader__loading {
+                background-color: var(--color-surface-primary);
+            }
+        </style>
+        <!-- Start GTM Script -->
+        <script>
+            (function (w, d, s, l, i) {
+                w[l] = w[l] || [];
+                w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+                var f = d.getElementsByTagName(s)[0],
+                    j = d.createElement(s),
+                    dl = l != 'dataLayer' ? '&l=' + l : '';
+                j.async = true;
+                j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+                f.parentNode.insertBefore(j, f);
+            })(window, document, 'script', 'dataLayer', 'GTM-NF7884S');
+        </script>
+        <!-- End GTM Script -->
+        <!-- Start theme styles -->
+        <script type="text/javascript">
+            var ui_store = localStorage.getItem('ui_store');
+            var l = window.location;
+            if (ui_store && ui_store.length > 0) {
+                var is_dark_theme = false;
+                is_dark_theme = JSON.parse(ui_store).is_dark_mode_on || false;
+
+                if (is_dark_theme) {
+                    // if dark theme, change the property colors for dark theme
+                    document.documentElement.style.setProperty('--color-surface-primary', '#0e0e0e');
+                    document.documentElement.style.setProperty('--color-text-primary', '#fff');
+                }
+            }
+        </script>
+        <!-- End theme styles -->
+        <!-- Start Anti-Clickjack -->
+        <style id="antiClickjack">
+            body {
+                display: none !important;
+            }
+        </style>
+        <script type="text/javascript">
+            if (self === top) {
+                var antiClickjack = document.getElementById('antiClickjack');
+                antiClickjack.parentNode.removeChild(antiClickjack);
+            } else {
+                top.location = self.location;
+            }
+        </script>
+        <!-- End Anti-Clickjack -->
+
+        <noscript>Your browser does not support JavaScript!</noscript>
+
+        <!-- Start URL Handler -->
+        <script type="text/javascript">
+            (function (l) {
+                if (l.search) {
+                    // Create object without prototype to prevent pollution
+                    var q = Object.create(null);
+
+                    l.search
+                        .slice(1)
+                        .split('&')
+                        .forEach(function (v) {
+                            var a = v.split('=');
+                            var key = a[0];
+
+                            // Security checks
+                            if (!key || key.length === 0) return;
+                            if (key.includes('__proto__')) return;
+                            if (key.includes('constructor')) return;
+                            if (key.includes('prototype')) return;
+
+                            var value = a.slice(1).join('=').replace(/~and~/g, '&');
+                            q[key] = value;
+                        });
+
+                    // Use hasOwnProperty equivalent for prototype-less object
+                    if (Object.prototype.hasOwnProperty.call(q, 'p')) {
+                        window.history.replaceState(
+                            null,
+                            null,
+                            l.pathname.slice(0, -1) +
+                                (q.p || '') +
+                                (Object.prototype.hasOwnProperty.call(q, 'q') ? '?' + q.q : '') +
+                                l.hash
+                        );
+                    }
+                }
+            })(window.location);
+        </script>
+        <!-- End URL Handler -->
+        <!-- Start Cookies script -->
+        <script src="https://cdn.jsdelivr.net/npm/@deriv-com/marketing-utils@2.0.7/dist/cookie.js" async></script>
+        <!-- End Cookies script -->
+
+        <meta
+            name="description"
+            content=" Deriv gives everyone an easy way to participate in the financial markets. Trade with as little as $1 USD on major currencies, stocks, indices, and commodities."
+        />
+        <meta
+            name="keywords"
+            content=" digital options, forex, forex trading, online trading, financial trading, binary trading, index trading, trading indices, forex trades, trading commodities, digital options strategy, binary broker, binary bet, digital options trading platform, binary strategy, finance, stocks, investment, trading"
+        />
+        <meta name="author" content="Deriv" />
+        <!-- TODO: iOS zoom bug for input elements means we'll get a lower user accessibility score since we're not allowing dtrader.deriv.com to be scalable on mobile -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+        <meta name="theme-color" content="#414652" />
+        <meta name="dcterms.rightsHolder" content="Deriv" />
+        <meta name="dcterms.rights" content="Deriv" />
+        <meta name="google-site-verification" content="g5u3TyEdmYJ_HKZ6EmpW1nlKwD4XPVeLMhN9leeMfuw" />
+        <meta
+            property="og:description"
+            content="Deriv gives everyone an easy way to participate in the financial markets. Trade with as little as $1 USD on major currencies, stocks, indices, and commodities."
+        />
+        <meta property="og:title" content="Deriv" />
+        <meta property="og:type" content="website" />
+        <meta
+            property="og:image"
+            content="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTR3qsyDtQ_1mlX1AoeV963gFP0UZBTcJOcdK0G802Vfg&s"
+        />
+        <meta name="google" content="notranslate" />
+        <meta name="referrer" content="origin" />
+
+        <link rel="preconnect" href="https://fonts.gstatic.com" />
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://browser-update.org" />
+
+        <link rel="alternate" hreflang="en" href="https://dtrader.deriv.com" />
+        <link rel="canonical" href="https://dtrader.deriv.com" />
+
+        <title>Deriv Trader | Deriv</title>
+        <meta charset="UTF-8" />
+        <meta name="google-site-verification" content="g5u3TyEdmYJ_HKZ6EmpW1nlKwD4XPVeLMhN9leeMfuw" />
+    </head>
+
+    <body class="body theme">
+        <!-- Start GTM NoScript -->
+        <noscript
+            ><iframe
+                src="https://www.googletagmanager.com/ns.html?id=GTM-NF7884S"
+                height="0"
+                width="0"
+                style="display: none; visibility: hidden"
+            ></iframe
+        ></noscript>
+        <!-- End GTM NoScript -->
+
+        <!-- TODO: Display shell platform icon and text based on route -->
+
+        <div id="derivatives_trader" class="derivatives-trader">
+            <header class="header"></header>
+            <div class="app-contents">
+                <div class="initial-loader initial-loader__loading">
+                    <div class="initial-loader__barspinner barspinner barspinner-light">
+                        <div class="initial-loader__barspinner--rect barspinner__rect barspinner__rect--1 rect1"></div>
+                        <div class="initial-loader__barspinner--rect barspinner__rect barspinner__rect--2 rect2"></div>
+                        <div class="initial-loader__barspinner--rect barspinner__rect barspinner__rect--3 rect3"></div>
+                        <div class="initial-loader__barspinner--rect barspinner__rect barspinner__rect--4 rect4"></div>
+                        <div class="initial-loader__barspinner--rect barspinner__rect barspinner__rect--5 rect5"></div>
+                    </div>
+                </div>
+            </div>
+            <footer class="footer"></footer>
+        </div>
+        <div id="modal_root" class="modal-root"></div>
+        <!-- modal_root has background color. So, it cannot be used for toast messages. For those cases popup_root is used -->
+        <div id="popup_root" class="popup-root"></div>
+    </body>
+</html>

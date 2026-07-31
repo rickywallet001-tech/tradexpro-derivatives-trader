@@ -1,0 +1,64 @@
+import React from 'react';
+import classNames from 'classnames';
+
+import { Modal, Popover, Text } from '@deriv/components';
+import { TranslationFlag } from '@deriv/shared';
+import { observer, useStore } from '@deriv/stores';
+import { Localize, useTranslations } from '@deriv-com/translations';
+
+import LanguageSettings from '../../../Containers/SettingsModal/settings-language';
+
+import 'Sass/app/modules/settings.scss';
+
+const ToggleLanguageSettings = observer(({ showPopover }: { showPopover?: boolean }) => {
+    const { localize } = useTranslations();
+    const { common, ui } = useStore();
+    const { currentLang } = useTranslations();
+    const { is_language_settings_modal_on, toggleLanguageSettingsModal } = ui;
+    const { is_language_changing } = common;
+
+    const toggle_settings_class = classNames('ic-language', 'footer__link', {
+        'ic-settings--active': is_language_settings_modal_on,
+        'ic-settings--disabled': is_language_changing,
+    });
+
+    const content = (
+        <React.Fragment>
+            {TranslationFlag[currentLang] && TranslationFlag[currentLang](18, 12)}
+            <Text weight='bold' size='xxs' className='ic-settings-language__text'>
+                <Localize i18n_default_text={currentLang} />
+            </Text>
+        </React.Fragment>
+    );
+
+    return (
+        <React.Fragment>
+            <a
+                id='dt_language_settings_toggle'
+                data-testid='dt_toggle_language_settings'
+                onClick={toggleLanguageSettingsModal}
+                className={toggle_settings_class}
+            >
+                {showPopover ? (
+                    <Popover alignment='top' message={localize('Language')} zIndex='9999'>
+                        {content}
+                    </Popover>
+                ) : (
+                    content
+                )}
+            </a>
+            <Modal
+                id='dt_settings_modal'
+                is_open={is_language_settings_modal_on}
+                title={localize('Select language')}
+                toggleModal={toggleLanguageSettingsModal}
+                width='616px'
+                should_header_stick_body={false}
+            >
+                <LanguageSettings />
+            </Modal>
+        </React.Fragment>
+    );
+});
+
+export { ToggleLanguageSettings };
