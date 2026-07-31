@@ -132,8 +132,8 @@ const createInitialState = (trade_store: ReturnType<typeof useTraderStore>, deci
             error_2: second_payout_error,
             first_contract_payout,
             second_contract_payout,
-            is_first_payout_exceeded: !!first_payout_error && first_contract_payout > max_payout,
-            is_second_payout_exceeded: !!second_payout_error && second_contract_payout > max_payout,
+            is_first_payout_exceeded: !!first_payout_error && first_contract_payout > Number(max_payout),
+            is_second_payout_exceeded: !!second_payout_error && second_contract_payout > Number(max_payout),
             max_payout,
             max_stake,
             min_stake,
@@ -264,7 +264,7 @@ const StakeInput = observer(({ onClose, is_open }: TStakeInput) => {
                 payload: {
                     ...(max_payout ? { max_payout } : {}),
                     [`${contractType}_contract_payout`]: contract_payout || 0,
-                    [`is_${contractType}_payout_exceeded`]: !!error && contract_payout > max_payout,
+                    [`is_${contractType}_payout_exceeded`]: !!error && contract_payout > Number(max_payout),
                     [`error_${contractType === 'first' ? 1 : 2}`]: error,
                 },
             });

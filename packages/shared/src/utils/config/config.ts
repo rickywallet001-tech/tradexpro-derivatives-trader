@@ -43,6 +43,39 @@ export const getAccountTypeFromUrl = (): string => {
     return 'demo';
 };
 
+/**
+ * Gets account_type with priority: URL parameter > localStorage > default 'demo'
+ * @returns {string} 'real', 'demo', or 'demo' as default
+ */
+export const getAccountType = (): string => {
+    const search = window.location.search;
+    const search_params = new URLSearchParams(search);
+    const accountTypeFromUrl = search_params.get('account_type');
+
+    // First priority: URL parameter
+    if (accountTypeFromUrl === 'real' || accountTypeFromUrl === 'demo') {
+        window.localStorage.setItem('account_type', accountTypeFromUrl);
+
+        // Remove account_type from URL after processing
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('account_type')) {
+            url.searchParams.delete('account_type');
+            window.history.replaceState({}, document.title, url.toString());
+        }
+
+        return accountTypeFromUrl;
+    }
+
+    // Second priority: localStorage
+    const storedAccountType = window.localStorage.getItem('account_type');
+    if (storedAccountType === 'real' || storedAccountType === 'demo') {
+        return storedAccountType;
+    }
+
+    // Default to demo when no account_type parameter or invalid value
+    return 'demo';
+};
+
 export const getSocketURL = () => {
     const local_storage_server_url = window.localStorage.getItem('config.server_url');
     if (local_storage_server_url) return local_storage_server_url;
