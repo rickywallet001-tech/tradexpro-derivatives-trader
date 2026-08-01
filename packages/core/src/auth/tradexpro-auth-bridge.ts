@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- intentional temporary debug logging, see comments throughout */
+
 // Receives silent SSO from the parent tradexpro.co.ke site when this app is
 // embedded as its Manual Traders iframe. Speaks the same TRADEXPRO_AUTH /
 // DTRADER_AUTH_READY / AUTH_LOGOUT protocol as dtrader-template's own
@@ -29,7 +31,10 @@ interface TradexproAuthMessage {
 }
 
 function applyAuth(data: TradexproAuthMessage): void {
-    if (!data.token) return;
+    if (!data.token) {
+        console.warn('[TradexproAuthBridge] TRADEXPRO_AUTH received with no token, ignoring', data);
+        return;
+    }
 
     // Capture this BEFORE any writes -- it's what decides whether we
     // actually need to reload. Same reasoning as dtrader-template: this
@@ -50,6 +55,12 @@ function applyAuth(data: TradexproAuthMessage): void {
           ? [{ account: data.loginid, token: data.token }]
           : [];
 
+    console.log('[TradexproAuthBridge] applyAuth called', {
+        has_loginid: !!data.loginid,
+        accounts_count: accountsList.length,
+        previous_loginid: previousLoginid,
+    });
+
     if (accountsList.length) {
         const accountsMap: Record<string, unknown> = {};
         accountsList.forEach(acc => {
@@ -62,6 +73,11 @@ function applyAuth(data: TradexproAuthMessage): void {
             };
         });
         localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accountsMap));
+    } else {
+        console.warn(
+            '[TradexproAuthBridge] no accounts to write -- neither data.accounts nor data.loginid was present',
+            data
+        );
     }
 
     const activeLoginid = data.loginid || accountsList[0]?.account;
@@ -74,7 +90,10 @@ function applyAuth(data: TradexproAuthMessage): void {
     }
 
     if (activeLoginid && activeLoginid !== previousLoginid) {
+        console.log('[TradexproAuthBridge] loginid changed', previousLoginid, '->', activeLoginid, '-- reloading');
         window.location.reload();
+    } else {
+        console.log('[TradexproAuthBridge] loginid unchanged, no reload needed');
     }
 }
 
@@ -88,10 +107,24 @@ function clearAuth(): void {
 export function initTradexproAuthBridge(): void {
     // Not embedded -- e.g. loaded directly, or in an iframe on some other
     // site. Nothing to do.
-    if (window.self === window.top) return;
+    if (window.self === window.top) {
+        console.log('[TradexproAuthBridge] not embedded (window.self === window.top), skipping');
+        return;
+    }
+
+    console.log('[TradexproAuthBridge] initializing, expecting parent origin', PARENT_ORIGIN);
 
     window.addEventListener('message', (event: MessageEvent) => {
-        if (event.origin !== PARENT_ORIGIN) return;
+        if (event.origin !== PARENT_ORIGIN) {
+            // Logged at this level (not just dropped silently) because a
+            // subtly wrong PARENT_ORIGIN comparison is exactly the kind of
+            // bug that would otherwise look identical to "message never
+            // arrived" from the outside.
+            console.log('[TradexproAuthBridge] ignoring message from unexpected origin', event.origin, event.data);
+            return;
+        }
+
+        console.log('[TradexproAuthBridge] received message from parent', event.data?.type, event.data);
 
         if (event.data?.type === 'TRADEXPRO_AUTH') {
             applyAuth(event.data as TradexproAuthMessage);
@@ -103,5 +136,6 @@ export function initTradexproAuthBridge(): void {
     // Parent resends auth whenever it sees this, and also proactively
     // whenever its own login state settles -- either path gets us
     // authenticated without the user doing anything in this iframe.
+    console.log('[TradexproAuthBridge] sending DTRADER_AUTH_READY to parent');
     window.parent.postMessage({ type: 'DTRADER_AUTH_READY' }, PARENT_ORIGIN);
 }
