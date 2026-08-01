@@ -130,6 +130,7 @@ const AppContents = observer(({ children }) => {
                 'app-contents--is-scrollable': is_cfd_page || is_cashier_visible,
                 'app-contents--is-hidden': has_access_denied_error,
                 'app-contents--is-dtrader-v2': isMobile,
+                'app-contents--is-embedded': window.self !== window.top,
             })}
             ref={scroll_ref}
         >

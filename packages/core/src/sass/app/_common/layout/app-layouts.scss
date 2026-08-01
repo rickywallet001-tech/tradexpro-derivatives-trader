@@ -116,6 +116,10 @@
         margin: 0 !important;
         height: inherit;
     }
+    &--is-embedded {
+        margin-top: 0 !important;
+        height: 100vh !important;
+    }
 
     @include mobile-screen {
         .ciq-menu {
