@@ -31,20 +31,6 @@
                 background-color: var(--color-surface-primary);
             }
         </style>
-        <!-- Start GTM Script -->
-        <script>
-            (function (w, d, s, l, i) {
-                w[l] = w[l] || [];
-                w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
-                var f = d.getElementsByTagName(s)[0],
-                    j = d.createElement(s),
-                    dl = l != 'dataLayer' ? '&l=' + l : '';
-                j.async = true;
-                j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
-                f.parentNode.insertBefore(j, f);
-            })(window, document, 'script', 'dataLayer', 'GTM-NF7884S');
-        </script>
-        <!-- End GTM Script -->
         <!-- Start theme styles -->
         <script type="text/javascript">
             var ui_store = localStorage.getItem('ui_store');
@@ -61,21 +47,12 @@
             }
         </script>
         <!-- End theme styles -->
-        <!-- Start Anti-Clickjack -->
-        <style id="antiClickjack">
-            body {
-                display: none !important;
-            }
-        </style>
-        <script type="text/javascript">
-            if (self === top) {
-                var antiClickjack = document.getElementById('antiClickjack');
-                antiClickjack.parentNode.removeChild(antiClickjack);
-            } else {
-                top.location = self.location;
-            }
-        </script>
-        <!-- End Anti-Clickjack -->
+        <!-- Anti-Clickjack handled via CSP frame-ancestors (see _headers) instead of
+             the old body-display:none + top.location=self.location approach.
+             That approach has no path to un-hide the body for legitimate embedding
+             (e.g. tradexpro.co.ke's Manual Traders iframe): the only way out of
+             display:none was the top-navigation attempt, which a sandboxed iframe
+             correctly blocks, leaving the body permanently hidden with no recovery. -->
 
         <noscript>Your browser does not support JavaScript!</noscript>
 
@@ -151,7 +128,6 @@
         <meta name="referrer" content="origin" />
 
         <link rel="preconnect" href="https://fonts.gstatic.com" />
-        <link rel="preconnect" href="https://www.googletagmanager.com" />
         <link rel="preconnect" href="https://browser-update.org" />
 
         <link rel="alternate" hreflang="en" href="https://dtrader.deriv.com" />
@@ -163,17 +139,6 @@
     </head>
 
     <body class="body theme">
-        <!-- Start GTM NoScript -->
-        <noscript
-            ><iframe
-                src="https://www.googletagmanager.com/ns.html?id=GTM-NF7884S"
-                height="0"
-                width="0"
-                style="display: none; visibility: hidden"
-            ></iframe
-        ></noscript>
-        <!-- End GTM NoScript -->
-
         <!-- TODO: Display shell platform icon and text based on route -->
 
         <div id="derivatives_trader" class="derivatives-trader">
