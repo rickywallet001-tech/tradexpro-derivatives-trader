@@ -361,7 +361,9 @@ export default class TradeStore extends BaseStore {
     strike_price_choices: TBarriersData = {};
 
     // Mobile
-    is_trade_params_expanded = true;
+    // Collapsed by default so the chart is visible above the fold on load;
+    // user can still expand the panel via the collapsible handle.
+    is_trade_params_expanded = false;
     v2_params_initial_values: TV2ParamsInitialValues = {};
 
     debouncedSetChartStatus = debounce((status: boolean) => {

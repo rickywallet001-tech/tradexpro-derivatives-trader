@@ -889,6 +889,17 @@
         grid-template-areas: 'a b';
         grid-column-gap: 0.5rem;
 
+        // Pin the Buy/Sell button(s) to the bottom of the viewport instead
+        // of scrolling away with the rest of the trade ticket.
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 5;
+        padding: 0.8rem 0.8rem calc(0.8rem + env(safe-area-inset-bottom, 0px));
+        background: var(--general-main-1, #fff);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+
         &__accumulator {
             grid-template-areas: 'a';
             .purchase-container__option {

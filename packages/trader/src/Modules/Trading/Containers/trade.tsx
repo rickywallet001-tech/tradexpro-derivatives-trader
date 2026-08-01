@@ -182,8 +182,12 @@ const Trade = observer(() => {
 
     const form_wrapper_class = isMobile ? 'mobile-wrapper' : 'sidebar__container';
     const chart_height_offset = React.useMemo(() => {
-        if (is_accumulator) return '295px';
-        if (is_turbos) return '300px';
+        // Trade params panel now starts collapsed, so we no longer need to
+        // reserve space for the fully expanded ticket by default. This is
+        // still an offset (not 0) because the collapsed bar + sticky Buy
+        // button still occupy some fixed space at the bottom.
+        if (is_accumulator) return '140px';
+        if (is_turbos) return '150px';
         return '259px';
     }, [is_turbos, is_accumulator]);
 

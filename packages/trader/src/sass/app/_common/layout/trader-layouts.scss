@@ -425,8 +425,16 @@ $FLOATING_HEADER_HEIGHT: 41px;
 
     .trade-container--accumulators &,
     .trade-container--turbos & {
-        height: 25.4rem;
+        // Was 25.4rem when the panel opened expanded by default and the Buy
+        // button lived inline. Now the panel starts collapsed (compact bar
+        // only) and the Buy button is pinned via .purchase-container, so
+        // much less space needs to be reserved here.
+        height: 13rem;
     }
+
+    // Leave room at the bottom so scrolled/expanded content isn't hidden
+    // behind the now-fixed .purchase-container Buy button.
+    padding-bottom: calc(7.2rem + env(safe-area-inset-bottom, 0px));
     &__content-loader {
         position: absolute;
         height: 100%;
