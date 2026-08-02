@@ -1178,6 +1178,34 @@ export default class TradeStore extends BaseStore {
     ) {
         if (!this.is_purchase_enabled) return;
         if (proposal_id) {
+            // Stopgap safety net: block the purchase client-side unless we
+            // have a known, current balance that actually covers the
+            // stake. Fails closed - if balance hasn't loaded yet
+            // (client.balance is undefined -> current_balance is NaN),
+            // that's treated as "cannot verify -> block", not "unknown ->
+            // allow". This repo had no client-side balance check
+            // anywhere in the purchase path before this - purchases relied
+            // entirely on server-side rejection.
+            const current_balance = Number(this.root_store.client.balance);
+            const stake_amount = Number(price);
+            const balance_unknown = Number.isNaN(current_balance);
+            const stake_invalid = Number.isNaN(stake_amount);
+            const insufficient = !balance_unknown && !stake_invalid && stake_amount > current_balance;
+            if (balance_unknown || stake_invalid || insufficient) {
+                this.disablePurchaseButtons();
+                this.root_store.common.setServicesError(
+                    {
+                        type: 'buy',
+                        code: 'InsufficientBalance',
+                        message: balance_unknown
+                            ? 'Unable to verify your balance yet. Please wait a moment and try again.'
+                            : 'Insufficient balance. Please top up your account or lower your stake.',
+                    },
+                    is_dtrader_v2 ?? false
+                );
+                return;
+            }
+
             runInAction(() => {
                 this.is_purchase_enabled = false;
                 this.is_purchasing_contract = true;
