@@ -19,7 +19,7 @@ import TradeErrorSnackbar from 'AppV2/Components/TradeErrorSnackbar';
 import { TradeParameters, TradeParametersContainer } from 'AppV2/Components/TradeParameters';
 import useContractsFor from 'AppV2/Hooks/useContractsFor';
 import useDefaultSymbol from 'AppV2/Hooks/useDefaultSymbol';
-import { getChartHeight, HEIGHT } from 'AppV2/Utils/layout-utils';
+import { getChartHeight } from 'AppV2/Utils/layout-utils';
 import { getDisplayedContractTypes } from 'AppV2/Utils/trade-types-utils';
 import { isDigitTradeType } from 'Modules/Trading/Helpers/digits';
 import { useTraderStore } from 'Stores/useTraderStores';
@@ -30,7 +30,6 @@ import { TradeChart } from '../Chart';
 import TradeTypes from './trade-types';
 
 const Trade = observer(() => {
-    const [is_minimized_params_visible, setIsMinimizedParamsVisible] = React.useState(false);
     const chart_ref = React.useRef<HTMLDivElement>(null);
     const {
         client: { is_logged_in },
@@ -100,15 +99,6 @@ const Trade = observer(() => {
         [trade_types, onChange, symbol]
     );
 
-    const onScroll = React.useCallback(() => {
-        const current_chart_ref = chart_ref?.current;
-        if (current_chart_ref) {
-            const chart_bottom_Y = current_chart_ref.getBoundingClientRect().bottom;
-            const container_bottom_Y = window.innerHeight - HEIGHT.BOTTOM_NAV;
-            setIsMinimizedParamsVisible(chart_bottom_Y <= container_bottom_Y);
-        }
-    }, []);
-
     React.useEffect(() => {
         onMount();
         return onUnmount;
@@ -116,7 +106,7 @@ const Trade = observer(() => {
     }, [current_language, network_status.class]);
 
     return (
-        <BottomNav onScroll={onScroll}>
+        <BottomNav>
             {symbols.length && trade_types.length ? (
                 <React.Fragment>
                     <div className='trade'>
@@ -145,9 +135,6 @@ const Trade = observer(() => {
                         </TradeParametersContainer>
                     </div>
                     <div className={clsx('trade__parameter', { 'trade__parameter--with-button': !is_market_closed })}>
-                        <TradeParametersContainer is_minimized_visible={is_minimized_params_visible} is_minimized>
-                            <TradeParameters is_minimized />
-                        </TradeParametersContainer>
                         {!is_market_closed && <PurchaseButton />}
                     </div>
                     {!guide_dtrader_v2?.trade_page && is_logged_in && (
