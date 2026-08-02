@@ -65,6 +65,18 @@
             height: unset;
         }
     }
+    &:not(.trade-params--minimized) {
+        // Same underlying issue dtrader-template hit (ported from there,
+        // commit 2ad4ba11ca): the expanded panel had no height constraint
+        // at all. On a short/landscape viewport, content past the visible
+        // area was simply unreachable -- not scrollable, just cut off.
+        // Sized generously enough that the actual param rows fit without
+        // needing to scroll on a typical phone viewport; this is a safety
+        // net for the edge case, not the primary layout mechanism.
+        max-height: calc(100vh - 5.6rem - 8rem);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
     &--minimized {
         min-height: var(--core-size-3600);
         width: 100%;
