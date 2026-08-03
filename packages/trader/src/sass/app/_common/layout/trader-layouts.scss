@@ -419,7 +419,10 @@ $FLOATING_HEADER_HEIGHT: 41px;
     padding: 0 0.8rem;
     display: flex;
     flex-direction: column;
-    height: 218px;
+    // Was 218px (upstream default, sized for the fully-expanded panel).
+    // Same collapsed-by-default panel change applies to every trade type,
+    // not just accumulators/turbos -- reduced proportionally to match.
+    height: 110px;
     position: relative;
     z-index: 2;
 

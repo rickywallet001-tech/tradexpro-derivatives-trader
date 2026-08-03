@@ -188,7 +188,12 @@ const Trade = observer(() => {
         // button still occupy some fixed space at the bottom.
         if (is_accumulator) return '140px';
         if (is_turbos) return '150px';
-        return '259px';
+        // Was 259px (upstream default, sized for the fully-expanded panel).
+        // Every other trade type (Rise/Fall, Over/Under, Matches/Differs,
+        // etc.) also now starts with the trade-params panel collapsed, same
+        // as accumulators/turbos above -- this just wasn't updated when
+        // that change was made. Reduced proportionally.
+        return '120px';
     }, [is_turbos, is_accumulator]);
 
     return (
