@@ -30,6 +30,41 @@ interface TradexproAuthMessage {
     accounts?: IncomingAccount[];
 }
 
+// Safe wrappers - a single storage operation throwing (SecurityError from
+// storage restrictions, private browsing, quota exceeded, etc - all more
+// likely in this embedded-iframe context on mobile than on desktop) must
+// not abort the rest of applyAuth(). Without this, one blocked write could
+// silently prevent the reload that actually authenticates the page,
+// leaving the app boot-looping in its initial unauthenticated state
+// forever - every data-dependent hook downstream just hangs waiting for
+// authorization that never arrives.
+function safeGetItem(storage: Storage, key: string): string | null {
+    try {
+        return storage.getItem(key);
+    } catch (err) {
+        console.warn('[TradexproAuthBridge] storage read failed', key, err);
+        return null;
+    }
+}
+
+function safeSetItem(storage: Storage, key: string, value: string): boolean {
+    try {
+        storage.setItem(key, value);
+        return true;
+    } catch (err) {
+        console.warn('[TradexproAuthBridge] storage write failed', key, err);
+        return false;
+    }
+}
+
+function safeRemoveItem(storage: Storage, key: string): void {
+    try {
+        storage.removeItem(key);
+    } catch (err) {
+        console.warn('[TradexproAuthBridge] storage remove failed', key, err);
+    }
+}
+
 function applyAuth(data: TradexproAuthMessage): void {
     if (!data.token) {
         console.warn('[TradexproAuthBridge] TRADEXPRO_AUTH received with no token, ignoring', data);
@@ -47,7 +82,7 @@ function applyAuth(data: TradexproAuthMessage): void {
     // dtrader-template: only the first TRADEXPRO_AUTH message would ever
     // take effect, and every later Demo<->Real switch would silently
     // write new storage the running app never picks up.
-    const previousLoginid = sessionStorage.getItem(ACTIVE_LOGINID_KEY);
+    const previousLoginid = safeGetItem(sessionStorage, ACTIVE_LOGINID_KEY);
 
     const accountsList = data.accounts?.length
         ? data.accounts
@@ -72,7 +107,7 @@ function applyAuth(data: TradexproAuthMessage): void {
                 session_start: Math.floor(Date.now() / 1000),
             };
         });
-        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accountsMap));
+        safeSetItem(localStorage, ACCOUNTS_KEY, JSON.stringify(accountsMap));
     } else {
         console.warn(
             '[TradexproAuthBridge] no accounts to write -- neither data.accounts nor data.loginid was present',
@@ -85,8 +120,8 @@ function applyAuth(data: TradexproAuthMessage): void {
         // getActiveLoginIDFromLocalStorage checks sessionStorage first,
         // then falls back to localStorage -- set both so a stale entry
         // from an earlier boot in this tab can't shadow this value.
-        sessionStorage.setItem(ACTIVE_LOGINID_KEY, activeLoginid);
-        localStorage.setItem(ACTIVE_LOGINID_KEY, activeLoginid);
+        safeSetItem(sessionStorage, ACTIVE_LOGINID_KEY, activeLoginid);
+        safeSetItem(localStorage, ACTIVE_LOGINID_KEY, activeLoginid);
     }
 
     if (activeLoginid && activeLoginid !== previousLoginid) {
@@ -98,9 +133,9 @@ function applyAuth(data: TradexproAuthMessage): void {
 }
 
 function clearAuth(): void {
-    localStorage.removeItem(ACCOUNTS_KEY);
-    sessionStorage.removeItem(ACTIVE_LOGINID_KEY);
-    localStorage.removeItem(ACTIVE_LOGINID_KEY);
+    safeRemoveItem(localStorage, ACCOUNTS_KEY);
+    safeRemoveItem(sessionStorage, ACTIVE_LOGINID_KEY);
+    safeRemoveItem(localStorage, ACTIVE_LOGINID_KEY);
     window.location.reload();
 }
 
