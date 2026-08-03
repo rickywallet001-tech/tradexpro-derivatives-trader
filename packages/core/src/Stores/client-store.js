@@ -331,6 +331,26 @@ export default class ClientStore extends BaseStore {
         if (oneTimeToken) {
             this.removeTokenFromUrl();
             authorize_response = await this.authenticateV2(oneTimeToken);
+
+            if (authorize_response?.error) {
+                // SessionStore caches this query string as 'signup_query_param'
+                // (see the `search = SessionStore?.get?.(...)` read above) and
+                // reuses it on every future init() -- including the live URL
+                // no longer having a ?token= param at all. If the token was
+                // rejected (e.g. "Input validation failed: get_session_token"),
+                // that stale value would otherwise be retried forever on every
+                // subsequent load with no way to recover. Clear it, and fall
+                // back to a normal existing-session/logged-out boot instead of
+                // permanently failing.
+                try {
+                    SessionStore?.set?.('signup_query_param', '');
+                } catch (error) {
+                    // best-effort cleanup only
+                }
+
+                const fallbackSessionToken = this.getStoredSessionToken();
+                authorize_response = fallbackSessionToken ? await this.authenticateV2(null) : null;
+            }
         } else if (existingSessionToken) {
             authorize_response = await this.authenticateV2(null);
         } else {
