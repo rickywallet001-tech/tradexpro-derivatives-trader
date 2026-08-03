@@ -125,8 +125,26 @@ function applyAuth(data: TradexproAuthMessage): void {
     }
 
     if (activeLoginid && activeLoginid !== previousLoginid) {
-        console.log('[TradexproAuthBridge] loginid changed', previousLoginid, '->', activeLoginid, '-- reloading');
-        window.location.reload();
+        // A bare reload only ever re-read client.accounts/active_loginid,
+        // which sets display info (loginid, current_account) but never
+        // triggers a live authorize call -- confirmed in client-store.js:
+        // authorize_response (and subscribeBalance(), gated entirely behind
+        // it) is only ever populated via the oneTimeToken/session-token
+        // path (a ?token= URL param, read once then stripped via
+        // removeTokenFromUrl -- the classic one-time SSO handoff pattern).
+        // That's why balance stayed permanently unpopulated no matter how
+        // correct the account/token data in storage was. Appending our
+        // token to the URL instead routes through that same real flow.
+        const url = new URL(window.location.href);
+        url.searchParams.set('token', data.token);
+        console.log(
+            '[TradexproAuthBridge] loginid changed',
+            previousLoginid,
+            '->',
+            activeLoginid,
+            '-- navigating with token to trigger live authorize'
+        );
+        window.location.href = url.toString();
     } else {
         console.log('[TradexproAuthBridge] loginid unchanged, no reload needed');
     }
