@@ -137,10 +137,15 @@ const BinarySocketGeneral = (() => {
         BinarySocket.sendBuffered(); // Send queued requests
     };
 
+    const ensureBalanceSubscription = () => {
+        subscribeBalance();
+    };
+
     return {
         init,
         setBalanceActiveAccount,
         authorizeAccount,
+        ensureBalanceSubscription,
     };
 })();
 
