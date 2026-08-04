@@ -28,6 +28,35 @@ export default function register() {
     if (/* process.env.NODE_ENV === 'production' && */ 'serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             const sw_url = `${window.location.origin}${getUrlBase('/service-worker.js')}`;
+
+            // Defensive cleanup: a service worker registered by a *previous,
+            // unrelated* deployment at this same origin (e.g. an earlier
+            // build that isn't this app) keeps controlling the page and
+            // serving its own cached assets/behaviour until it's explicitly
+            // unregistered -- deploying new code to the server does not
+            // remove it from browsers that already installed it. That can
+            // manifest as: requests for assets this app never references,
+            // and/or the service worker's fetch handler intercepting and
+            // failing requests (including auth calls) that were never meant
+            // to go through it. Unregister anything whose active script
+            // doesn't match this app's own service worker before proceeding.
+            navigator.serviceWorker
+                .getRegistrations()
+                .then(registrations => {
+                    registrations.forEach(reg => {
+                        const activeUrl = reg.active?.scriptURL;
+                        if (activeUrl && activeUrl !== sw_url) {
+                            // eslint-disable-next-line no-console
+                            console.log('[SW cleanup] Unregistering stale/unrelated service worker:', activeUrl);
+                            reg.unregister();
+                        }
+                    });
+                })
+                .catch(error => {
+                    // eslint-disable-next-line no-console
+                    console.error('Error while checking for stale service workers:', error);
+                });
+
             navigator.serviceWorker
                 .register(sw_url)
                 .then(registration => {
