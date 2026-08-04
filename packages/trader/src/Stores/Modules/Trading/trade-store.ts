@@ -1178,6 +1178,26 @@ export default class TradeStore extends BaseStore {
     ) {
         if (!this.is_purchase_enabled) return;
         if (proposal_id) {
+            // A logged-out visitor can still fetch proposals (public price
+            // data) and reach this point with is_purchase_enabled true, then
+            // fall into the balance check below with client.balance
+            // permanently undefined -- producing "Unable to verify your
+            // balance yet. Please wait a moment and try again." for someone
+            // who was never going to have a balance to verify. Route this
+            // case to the correct, existing AuthorizationRequired modal
+            // instead, before the balance stopgap even runs.
+            if (!this.root_store.client.is_logged_in) {
+                this.disablePurchaseButtons();
+                this.root_store.common.setServicesError(
+                    {
+                        type: 'buy',
+                        code: 'AuthorizationRequired',
+                        message: 'Log in or create a free account to place a trade.',
+                    },
+                    is_dtrader_v2 ?? false
+                );
+                return;
+            }
             // Stopgap safety net: block the purchase client-side unless we
             // have a known, current balance that actually covers the
             // stake. Fails closed - if balance hasn't loaded yet
