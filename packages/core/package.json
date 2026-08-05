@@ -7,7 +7,7 @@
     "scripts": {
         "start": "npm run test && npm run serve",
         "serve": "f() { echo \"Serving...\" && ../../node_modules/.bin/webpack serve --config \"./build/webpack.config.js\" --env open $1;}; f",
-        "build": "f () { webpack --config \"./build/webpack.config.js\" --env base=$1;}; f",
+        "build": "f () { NODE_ENV=production webpack --config \"./build/webpack.config.js\" --env base=$1;}; f",
         "test:eslint": "eslint \"./src/**/*.?(js|jsx|ts|tsx)\""
     },
     "repository": {
