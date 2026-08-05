@@ -278,6 +278,17 @@ export default class ClientStore extends BaseStore {
             this.setLoginId(authorize.loginid);
         });
 
+        // Successful authorize means we're logged in. If a stale
+        // 'AuthorizationRequired' (or InvalidToken-style) services_error
+        // modal was opened by an earlier request that raced the auth
+        // bridge, it never gets cleared on its own -- clear it now so the
+        // "Start trading with us" modal doesn't stay stuck open after login.
+        const stale_error_code = this.root_store?.common?.services_error?.code;
+        if (stale_error_code === 'AuthorizationRequired' || stale_error_code === 'InvalidToken') {
+            this.root_store.common.resetServicesError();
+            this.root_store.ui.toggleServicesErrorModal(false);
+        }
+
         this.user_id = authorize.user_id || '';
         if (this.user_id) {
             localStorage.setItem('active_user_id', this.user_id);
