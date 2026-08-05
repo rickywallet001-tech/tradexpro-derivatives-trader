@@ -2,7 +2,6 @@ import React from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 
 import { Button, Modal } from '@deriv/components';
-import { getBrandUrl } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
 import { useTranslations } from '@deriv-com/translations';
 
@@ -36,9 +35,10 @@ const InsufficientBalanceModal = observer(
                         text={is_virtual ? localize('OK') : localize('Deposit now')}
                         onClick={() => {
                             if (!is_virtual) {
-                                // Redirect to the brand deposit page
-                                const brandUrl = getBrandUrl();
-                                window.location.href = `${brandUrl}/deposit`;
+                                // Redirect to AbePay (instant M-Pesa <-> Deriv
+                                // deposits/withdrawals). Was `${getBrandUrl()}/deposit`.
+                                window.open('https://app.abepayy.com/', '_blank', 'noopener,noreferrer');
+                                toggleModal();
                             } else {
                                 toggleModal();
                             }

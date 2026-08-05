@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { getBrandUrl, isEmptyObject, redirectToLogin, redirectToSignUp } from '@deriv/shared';
+import { isEmptyObject, redirectToLogin, redirectToSignUp } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
 import { ActionSheet } from '@deriv-com/quill-ui';
 import { Localize } from '@deriv-com/translations';
@@ -41,8 +41,9 @@ const ServiceErrorSheet = observer(() => {
                     onAction: () => {
                         resetServicesError();
                         if (!is_virtual) {
-                            const brandUrl = getBrandUrl();
-                            window.location.href = `${brandUrl}/deposit`;
+                            // Redirect to AbePay (instant M-Pesa <-> Deriv
+                            // deposits/withdrawals). Was `${getBrandUrl()}/deposit`.
+                            window.open('https://app.abepayy.com/', '_blank', 'noopener,noreferrer');
                         } else {
                             onClose();
                         }
