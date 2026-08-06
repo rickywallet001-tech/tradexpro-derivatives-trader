@@ -127,6 +127,28 @@ export default class ClientStore extends BaseStore {
             }
         );
 
+        // The only place in this app that opens the "Start trading with us"
+        // (AuthorizationRequired) modal is trade-store.ts's Buy-click guard,
+        // which fires whenever is_logged_in reads false at click time. The
+        // one-time responseAuthorize() clear (see responseAuthorize below)
+        // only helps if that click raced *before* login finished -- it does
+        // nothing if the click (and resulting error) happens after login
+        // already completed, since no further authorize() call remains to
+        // trigger the clear. Watch is_logged_in directly instead: any time
+        // it becomes true, close a stale AuthorizationRequired/InvalidToken
+        // modal regardless of when it was opened relative to login.
+        reaction(
+            () => this.is_logged_in,
+            is_logged_in => {
+                if (!is_logged_in) return;
+                const stale_error_code = this.root_store?.common?.services_error?.code;
+                if (stale_error_code === 'AuthorizationRequired' || stale_error_code === 'InvalidToken') {
+                    this.root_store.common.resetServicesError();
+                    this.root_store.ui.toggleServicesErrorModal(false);
+                }
+            }
+        );
+
         when(
             () => !this.is_logged_in && this.root_store.ui && this.root_store.ui.is_real_acc_signup_on,
             () => this.root_store.ui.closeRealAccountSignup()
