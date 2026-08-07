@@ -19,23 +19,39 @@ const ACTIVE_LOGINID_KEY = 'active_loginid';
 // ROOT CAUSE of the persistent "Start trading with us" login modal
 // (traced 2026-08-07): this file used to decide whether to reload with
 // ?token= by comparing activeLoginid against sessionStorage's previous
-// value. sessionStorage survives a plain page reload, but a reload
-// always resets client-store.js's module state -- confirmed in
-// client-store.js's boot sequence: the ONLY path that ever performs a
-// real authorize() is the oneTimeToken (?token=) branch;
-// getStoredSessionToken() (the sole fallback) reads
-// localStorage['session_token'] / a session_token cookie, which is
-// something else entirely -- nothing this bridge writes ever reaches
-// it. So once the storage-based check decided "loginid unchanged, no
-// reload needed", THIS document load -- which had just been freshly
-// created and had never itself gone through the oneTimeToken branch --
-// had no authorization path left at all, and silently booted
-// logged-out forever. An in-memory flag, naturally reset on every real
-// page load (unlike sessionStorage), correctly tracks whether *this*
-// document instance has actually done its one required reload, instead
-// of whether the account happens to match a previous, unrelated
-// document instance.
-let hasReloadedWithTokenThisLoad = false;
+// value. sessionStorage survives a plain page reload, but client-store.js's
+// boot sequence only ever performs a real authorize() via the
+// oneTimeToken (?token=) branch; getStoredSessionToken() (the sole
+// fallback) reads localStorage['session_token'] / a session_token
+// cookie, which nothing this bridge writes ever touches. So once the
+// storage comparison decided "loginid unchanged, no reload needed" for
+// a document that merely matched an earlier, separate document
+// instance's last-written value, that document had no authorization
+// path left and silently booted logged-out permanently.
+//
+// A naive in-memory "have I reloaded yet this document instance" flag
+// (tried first, reverted 2026-08-07 after it caused an infinite reload
+// loop) doesn't work either: the parent resends TRADEXPRO_AUTH every
+// time this iframe sends DTRADER_AUTH_READY, and DTRADER_AUTH_READY is
+// sent again on every fresh load -- including the ones this file's own
+// reload just caused -- so an in-memory flag that starts false on every
+// load reloads again immediately, forever.
+//
+// The actual fix needs both pieces: hadTokenAtLoad captures, at module
+// eval time (index.tsx calls initTradexproAuthBridge() synchronously,
+// before client-store's async init() ever runs removeTokenFromUrl()),
+// whether THIS document was itself requested with a ?token= -- i.e.
+// whether it's already the result of one of our redirects. Combined
+// with the original loginid comparison, a message is only treated as
+// needing a reload if the account actually changed, OR this document
+// never had a token to begin with (a plain refresh/first visit, which
+// is exactly the original bug's case). Once reloadedThisInstance is
+// set, no further message in this same document instance reloads
+// again, breaking the loop; a document that already booted with a
+// token never has a reason to reload for the same account, so the loop
+// never starts in the first place.
+const hadTokenAtLoad = new URLSearchParams(window.location.search).has('token');
+let reloadedThisInstance = false;
 
 interface IncomingAccount {
     account: string;
@@ -92,17 +108,9 @@ function applyAuth(data: TradexproAuthMessage): void {
         return;
     }
 
-    // Capture this BEFORE any writes -- it's what decides whether we
-    // actually need to reload. Same reasoning as dtrader-template: this
-    // app reads client.accounts/active_loginid synchronously on boot, not
-    // reactively (the storage event listener in initStore.js only reacts
-    // when document.hidden, i.e. cross-tab sync -- it doesn't fire at all
-    // for writes made by this same document, and wouldn't reload a
-    // visible embedded iframe even if it did). A flat one-time reload
-    // flag would repeat the exact bug we already found and fixed once in
-    // dtrader-template: only the first TRADEXPRO_AUTH message would ever
-    // take effect, and every later Demo<->Real switch would silently
-    // write new storage the running app never picks up.
+    // Capture this BEFORE any writes -- combined with hadTokenAtLoad above,
+    // this is what decides whether we actually need to reload. See the
+    // module-level comment for why both checks are needed together.
     const previousLoginid = safeGetItem(sessionStorage, ACTIVE_LOGINID_KEY);
 
     const accountsList = data.accounts?.length
@@ -145,7 +153,7 @@ function applyAuth(data: TradexproAuthMessage): void {
         safeSetItem(localStorage, ACTIVE_LOGINID_KEY, activeLoginid);
     }
 
-    if (activeLoginid && !hasReloadedWithTokenThisLoad) {
+    if (activeLoginid && !reloadedThisInstance && (activeLoginid !== previousLoginid || !hadTokenAtLoad)) {
         // A bare reload only ever re-read client.accounts/active_loginid,
         // which sets display info (loginid, current_account) but never
         // triggers a live authorize call -- confirmed in client-store.js:
@@ -157,21 +165,29 @@ function applyAuth(data: TradexproAuthMessage): void {
         // correct the account/token data in storage was. Appending our
         // token to the URL instead routes through that same real flow.
         //
-        // hasReloadedWithTokenThisLoad (not a storage comparison -- see the
-        // module-level comment above) ensures this fires exactly once per
-        // real document load, regardless of whether the account happens to
-        // match whatever an earlier, separate document instance last wrote
-        // to sessionStorage.
-        hasReloadedWithTokenThisLoad = true;
+        // See the module-level comment above for why this condition needs
+        // both hadTokenAtLoad and the loginid comparison, and why either
+        // one alone reintroduces a bug (the modal, or an infinite reload
+        // loop) that was already hit and fixed once today.
+        reloadedThisInstance = true;
         const url = new URL(window.location.href);
         url.searchParams.set('token', data.token);
         console.log(
-            '[TradexproAuthBridge] reloading with token to trigger live authorize for this document load',
-            activeLoginid
+            '[TradexproAuthBridge] reloading with token to trigger live authorize',
+            previousLoginid,
+            '->',
+            activeLoginid,
+            'hadTokenAtLoad:',
+            hadTokenAtLoad
         );
         window.location.href = url.toString();
     } else {
-        console.log('[TradexproAuthBridge] already reloaded with token this document load, no reload needed');
+        console.log('[TradexproAuthBridge] no reload needed', {
+            activeLoginid,
+            previousLoginid,
+            hadTokenAtLoad,
+            reloadedThisInstance,
+        });
     }
 }
 
