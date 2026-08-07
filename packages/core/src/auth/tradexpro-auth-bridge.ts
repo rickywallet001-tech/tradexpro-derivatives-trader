@@ -16,6 +16,27 @@ const PARENT_ORIGIN = 'https://tradexpro.co.ke';
 const ACCOUNTS_KEY = 'client.accounts';
 const ACTIVE_LOGINID_KEY = 'active_loginid';
 
+// ROOT CAUSE of the persistent "Start trading with us" login modal
+// (traced 2026-08-07): this file used to decide whether to reload with
+// ?token= by comparing activeLoginid against sessionStorage's previous
+// value. sessionStorage survives a plain page reload, but a reload
+// always resets client-store.js's module state -- confirmed in
+// client-store.js's boot sequence: the ONLY path that ever performs a
+// real authorize() is the oneTimeToken (?token=) branch;
+// getStoredSessionToken() (the sole fallback) reads
+// localStorage['session_token'] / a session_token cookie, which is
+// something else entirely -- nothing this bridge writes ever reaches
+// it. So once the storage-based check decided "loginid unchanged, no
+// reload needed", THIS document load -- which had just been freshly
+// created and had never itself gone through the oneTimeToken branch --
+// had no authorization path left at all, and silently booted
+// logged-out forever. An in-memory flag, naturally reset on every real
+// page load (unlike sessionStorage), correctly tracks whether *this*
+// document instance has actually done its one required reload, instead
+// of whether the account happens to match a previous, unrelated
+// document instance.
+let hasReloadedWithTokenThisLoad = false;
+
 interface IncomingAccount {
     account: string;
     token: string;
@@ -124,7 +145,7 @@ function applyAuth(data: TradexproAuthMessage): void {
         safeSetItem(localStorage, ACTIVE_LOGINID_KEY, activeLoginid);
     }
 
-    if (activeLoginid && activeLoginid !== previousLoginid) {
+    if (activeLoginid && !hasReloadedWithTokenThisLoad) {
         // A bare reload only ever re-read client.accounts/active_loginid,
         // which sets display info (loginid, current_account) but never
         // triggers a live authorize call -- confirmed in client-store.js:
@@ -135,18 +156,22 @@ function applyAuth(data: TradexproAuthMessage): void {
         // That's why balance stayed permanently unpopulated no matter how
         // correct the account/token data in storage was. Appending our
         // token to the URL instead routes through that same real flow.
+        //
+        // hasReloadedWithTokenThisLoad (not a storage comparison -- see the
+        // module-level comment above) ensures this fires exactly once per
+        // real document load, regardless of whether the account happens to
+        // match whatever an earlier, separate document instance last wrote
+        // to sessionStorage.
+        hasReloadedWithTokenThisLoad = true;
         const url = new URL(window.location.href);
         url.searchParams.set('token', data.token);
         console.log(
-            '[TradexproAuthBridge] loginid changed',
-            previousLoginid,
-            '->',
-            activeLoginid,
-            '-- navigating with token to trigger live authorize'
+            '[TradexproAuthBridge] reloading with token to trigger live authorize for this document load',
+            activeLoginid
         );
         window.location.href = url.toString();
     } else {
-        console.log('[TradexproAuthBridge] loginid unchanged, no reload needed');
+        console.log('[TradexproAuthBridge] already reloaded with token this document load, no reload needed');
     }
 }
 
