@@ -660,6 +660,16 @@ export default class ClientStore extends BaseStore {
                 const sessionResponse = await WS.getSessionToken(oneTimeToken);
 
                 if (sessionResponse.error) {
+                    // Never logged anywhere before this: the login modal has
+                    // been persisting even after the auth bridge correctly
+                    // performs its one reload-with-token (confirmed
+                    // 2026-08-07 -- hadTokenAtLoad/reloadedThisInstance are
+                    // behaving exactly as designed). That means the failure
+                    // is downstream of the bridge, in this exact call. Log
+                    // the real rejection reason instead of only branching on
+                    // it, so it's actually visible instead of silently
+                    // falling back to a logged-out state.
+                    console.error('[authenticateV2] get_session_token rejected the token:', sessionResponse.error);
                     return {
                         error: {
                             code: 'TokenExchangeError',
@@ -687,6 +697,7 @@ export default class ClientStore extends BaseStore {
             const authorizeResponse = await BinarySocket.authorize(sessionToken);
 
             if (authorizeResponse.error) {
+                console.error('[authenticateV2] authorize(sessionToken) rejected:', authorizeResponse.error);
                 this.clearSessionToken();
                 return authorizeResponse;
             }
