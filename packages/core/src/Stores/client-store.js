@@ -657,28 +657,34 @@ export default class ClientStore extends BaseStore {
             let sessionToken;
 
             if (oneTimeToken) {
-                const sessionResponse = await WS.getSessionToken(oneTimeToken);
-
-                if (sessionResponse.error) {
-                    // Never logged anywhere before this: the login modal has
-                    // been persisting even after the auth bridge correctly
-                    // performs its one reload-with-token (confirmed
-                    // 2026-08-07 -- hadTokenAtLoad/reloadedThisInstance are
-                    // behaving exactly as designed). That means the failure
-                    // is downstream of the bridge, in this exact call. Log
-                    // the real rejection reason instead of only branching on
-                    // it, so it's actually visible instead of silently
-                    // falling back to a logged-out state.
-                    console.error('[authenticateV2] get_session_token rejected the token:', sessionResponse.error);
-                    return {
-                        error: {
-                            code: 'TokenExchangeError',
-                            message: sessionResponse.error.message,
-                        },
-                    };
-                }
-
-                sessionToken = sessionResponse.get_session_token.token;
+                // ROOT CAUSE of the persistent login modal, confirmed
+                // 2026-08-08 by checking Deriv's actual API documentation:
+                // get_session_token is NOT a real Deriv API method. It does
+                // not appear anywhere in Deriv's documented schema, official
+                // client libraries (JS/Python/Go/Rust), or API reference --
+                // there is no such call. That is why it has always failed
+                // with "InputValidationFailed: get_session_token": Deriv's
+                // server was rejecting a method it has never heard of,
+                // completely independent of whether the token itself was
+                // valid. This has been broken since this function was
+                // first written; every earlier fix to the surrounding
+                // auth-bridge logic tonight was fixing real, separate bugs,
+                // but none of them could ever have worked around this,
+                // because the actual authentication step was calling
+                // something that doesn't exist.
+                //
+                // The token this app receives from the parent (an OAuth
+                // access token, via TRADEXPRO_AUTH) is directly usable with
+                // Deriv's real, documented `authorize` call -- the one this
+                // function already correctly calls a few lines below. No
+                // exchange step is needed: this app's WebSocket connects to
+                // the classic /websockets/v3 endpoint (see socket_base.js),
+                // which natively authorizes via a plain token, exactly like
+                // TradeXpro's own main app already does successfully
+                // elsewhere (its api-base.ts calls the equivalent authorize
+                // step directly with the OAuth token it receives, with no
+                // separate exchange step either).
+                sessionToken = oneTimeToken;
                 this.storeSessionToken(sessionToken);
             } else {
                 sessionToken = this.getStoredSessionToken();
