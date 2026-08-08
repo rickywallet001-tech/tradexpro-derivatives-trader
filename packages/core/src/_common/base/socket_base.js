@@ -49,6 +49,35 @@ const BinarySocketBase = (() => {
         openNewConnection(session_id);
     };
 
+    // ROOT CAUSE fix (confirmed 2026-08-08 against Deriv's actual API docs):
+    // this app's WebSocket has always connected to the classic
+    // /websockets/v3 endpoint and tried to authenticate an OAuth-format
+    // token over it via get_session_token -- a method that doesn't exist in
+    // Deriv's real API -- then, after that was fixed, by passing the same
+    // OAuth token directly to the classic authorize call, which also
+    // rejects it (the token contains a '.', which the classic authorize
+    // param's validation regex ^[\w\-]{1,128}$ doesn't allow). Deriv's
+    // actual documented flow for this token format is entirely different:
+    // fetch a one-time-use, already-authenticated WebSocket URL via a REST
+    // call, then connect directly to THAT url -- no message-based
+    // authorize step at all ("No additional authentication headers are
+    // needed -- the OTP in the URL handles authentication"). This is
+    // exactly what TradeXpro's own main app already does successfully for
+    // the same account/token type.
+    const connectToOtpUrl = otpUrl => {
+        otp_override_url = otpUrl;
+        close();
+        is_switching_socket = true;
+        openNewConnection();
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timed out connecting to OTP-authenticated URL')), 15000);
+            deriv_api.onOpen().subscribe(() => {
+                clearTimeout(timeout);
+                resolve();
+            });
+        });
+    };
+
     const hasReadyState = (...states) => binary_socket && states.some(s => binary_socket.readyState === s);
 
     const init = ({ options, client }) => {
@@ -68,6 +97,15 @@ const BinarySocketBase = (() => {
               };
     };
 
+    // Set by connectToOtpUrl() when authenticating via Deriv's real Options
+    // API OTP flow (see authenticateV2 in client-store.js for why). When
+    // set, openNewConnection() connects here instead of the classic
+    // /websockets/v3 endpoint, and skips the classic authorize-on-open
+    // logic below, since the OTP in this URL already authenticates the
+    // connection per Deriv's own documentation ("No additional
+    // authentication headers are needed").
+    let otp_override_url = null;
+
     const openNewConnection = () => {
         const mock_server_config = getMockServerConfig();
         const session_id = mock_server_config?.session_id || '';
@@ -76,7 +114,7 @@ const BinarySocketBase = (() => {
 
         if (isClose()) {
             is_disconnect_called = false;
-            binary_socket = new WebSocket(getSocketUrl(session_id));
+            binary_socket = new WebSocket(otp_override_url || getSocketUrl(session_id));
 
             deriv_api = new DerivAPIBasic({
                 connection: binary_socket,
@@ -88,7 +126,7 @@ const BinarySocketBase = (() => {
         deriv_api.onOpen().subscribe(() => {
             config.wsEvent('open');
 
-            if (client_store.is_logged_in) {
+            if (!otp_override_url && client_store.is_logged_in) {
                 const authorize_token = client_store.getToken();
                 deriv_api.authorize(authorize_token);
             }
@@ -444,6 +482,7 @@ const BinarySocketBase = (() => {
         transferBetweenAccounts,
         fetchLoginHistory,
         closeAndOpenNewConnection,
+        connectToOtpUrl,
         accountStatistics,
         tradingServers,
         tradingPlatformNewAccount,

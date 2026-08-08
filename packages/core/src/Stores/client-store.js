@@ -654,55 +654,146 @@ export default class ClientStore extends BaseStore {
         try {
             this.setIsLoggingIn(true);
 
-            let sessionToken;
-
             if (oneTimeToken) {
                 // ROOT CAUSE of the persistent login modal, confirmed
-                // 2026-08-08 by checking Deriv's actual API documentation:
-                // get_session_token is NOT a real Deriv API method. It does
-                // not appear anywhere in Deriv's documented schema, official
-                // client libraries (JS/Python/Go/Rust), or API reference --
-                // there is no such call. That is why it has always failed
-                // with "InputValidationFailed: get_session_token": Deriv's
-                // server was rejecting a method it has never heard of,
-                // completely independent of whether the token itself was
-                // valid. This has been broken since this function was
-                // first written; every earlier fix to the surrounding
-                // auth-bridge logic tonight was fixing real, separate bugs,
-                // but none of them could ever have worked around this,
-                // because the actual authentication step was calling
-                // something that doesn't exist.
+                // 2026-08-08 by checking Deriv's actual API documentation,
+                // in two stages:
                 //
-                // The token this app receives from the parent (an OAuth
-                // access token, via TRADEXPRO_AUTH) is directly usable with
-                // Deriv's real, documented `authorize` call -- the one this
-                // function already correctly calls a few lines below. No
-                // exchange step is needed: this app's WebSocket connects to
-                // the classic /websockets/v3 endpoint (see socket_base.js),
-                // which natively authorizes via a plain token, exactly like
-                // TradeXpro's own main app already does successfully
-                // elsewhere (its api-base.ts calls the equivalent authorize
-                // step directly with the OAuth token it receives, with no
-                // separate exchange step either).
-                sessionToken = oneTimeToken;
-                this.storeSessionToken(sessionToken);
-            } else {
-                sessionToken = this.getStoredSessionToken();
+                // 1) get_session_token is NOT a real Deriv API method --
+                //    it appears nowhere in Deriv's documented schema,
+                //    official client libraries, or API reference. That's
+                //    why it always failed with "InputValidationFailed:
+                //    get_session_token".
+                //
+                // 2) The follow-up fix (passing the OAuth token straight to
+                //    the classic `authorize` call) was ALSO wrong: that
+                //    call's token param is validated against
+                //    ^[\w\-]{1,128}$, which rejects the '.' character this
+                //    token format always contains -- confirmed live,
+                //    "InputValidationFailed: authorize" with exactly that
+                //    regex in the error.
+                //
+                // Deriv's real documented flow for this token type is
+                // different in kind, not just in the call name: fetch a
+                // short-lived, already-authenticated WebSocket URL via a
+                // REST call (POST .../accounts/{accountId}/otp with the
+                // OAuth token as a Bearer header), then connect DIRECTLY to
+                // that URL -- "No additional authentication headers are
+                // needed -- the OTP in the URL handles authentication."
+                // There is no message-based authorize step for this token
+                // type at all. This is exactly what TradeXpro's own main
+                // app already does successfully for the same account/token
+                // type (see main-app's derivws-accounts.service.ts).
+                const accountId = localStorage.getItem('active_loginid') || sessionStorage.getItem('active_loginid');
 
-                if (!sessionToken) {
+                if (!accountId) {
                     return {
                         error: {
-                            code: 'NoSessionToken',
-                            message: 'No valid session token available',
+                            code: 'MissingAccountId',
+                            message: 'No active_loginid available to request an OTP-authenticated WebSocket URL',
                         },
                     };
                 }
+
+                let accountMeta = {};
+                try {
+                    const storedAccounts = JSON.parse(localStorage.getItem('client.accounts') || '[]');
+                    accountMeta = storedAccounts.find(a => a.account === accountId) || {};
+                } catch (e) {
+                    // fall through with empty accountMeta -- currency/is_virtual
+                    // just won't be pre-populated, they'll still arrive via the
+                    // normal balance/account-list flow shortly after.
+                }
+
+                let otpResponse;
+                try {
+                    const res = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${accountId}/otp`, {
+                        method: 'POST',
+                        headers: {
+                            'Deriv-App-ID': '33ughhvgtxloGWBQQZEeD',
+                            Authorization: `Bearer ${oneTimeToken}`,
+                        },
+                    });
+                    otpResponse = await res.json();
+                    if (!res.ok || !otpResponse?.data?.url) {
+                        // eslint-disable-next-line no-console
+                        console.error('[authenticateV2] OTP endpoint rejected the request:', otpResponse);
+                        return {
+                            error: {
+                                code: 'OtpRequestFailed',
+                                message:
+                                    otpResponse?.errors?.[0]?.message ||
+                                    'Failed to obtain OTP-authenticated WebSocket URL',
+                            },
+                        };
+                    }
+                } catch (fetchError) {
+                    // eslint-disable-next-line no-console
+                    console.error('[authenticateV2] OTP request threw:', fetchError);
+                    return {
+                        error: {
+                            code: 'OtpRequestFailed',
+                            message: fetchError?.message || 'Failed to reach the OTP endpoint',
+                        },
+                    };
+                }
+
+                try {
+                    await WS.connectToOtpUrl(otpResponse.data.url);
+                } catch (connectError) {
+                    // eslint-disable-next-line no-console
+                    console.error('[authenticateV2] Failed to connect to OTP-authenticated URL:', connectError);
+                    return {
+                        error: {
+                            code: 'OtpConnectFailed',
+                            message:
+                                connectError?.message || 'Failed to connect to the OTP-authenticated WebSocket URL',
+                        },
+                    };
+                }
+
+                // The connection itself is now authenticated -- there's no
+                // live authorize response to read fields from, so build the
+                // same shape from what's already known. balance starts at 0
+                // here deliberately: WS.subscribeBalance (triggered by the
+                // normal post-authorize flow below, same as the classic
+                // path) populates the real value moments later, exactly
+                // like it does for a classic authorize response too.
+                const authorizeResponse = {
+                    authorize: {
+                        loginid: accountId,
+                        balance: 0,
+                        currency: accountMeta.currency || 'USD',
+                        is_virtual: accountMeta.account_type === 'demo' ? 1 : 0,
+                        email: '',
+                        landing_company_name: '',
+                        country: '',
+                    },
+                };
+
+                localStorage.setItem('active_loginid', accountId);
+                sessionStorage.setItem('active_loginid', accountId);
+                this.responseAuthorize(authorizeResponse);
+                this.setIsLoggingIn(false);
+                return authorizeResponse;
+            }
+
+            const sessionToken = this.getStoredSessionToken();
+
+            if (!sessionToken) {
+                return {
+                    error: {
+                        code: 'NoSessionToken',
+                        message: 'No valid session token available',
+                    },
+                };
             }
 
             // Authorize with session token
             const authorizeResponse = await BinarySocket.authorize(sessionToken);
 
             if (authorizeResponse.error) {
+                // eslint-disable-next-line no-console
                 console.error('[authenticateV2] authorize(sessionToken) rejected:', authorizeResponse.error);
                 this.clearSessionToken();
                 return authorizeResponse;
