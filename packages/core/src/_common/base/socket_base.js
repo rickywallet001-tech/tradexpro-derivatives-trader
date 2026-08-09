@@ -46,6 +46,10 @@ const BinarySocketBase = (() => {
     const closeAndOpenNewConnection = (session_id = '') => {
         close();
         is_switching_socket = true;
+        // Force-clear the guard: this is a deliberate, intentional new
+        // connection request, not the kind of accidental race the guard
+        // exists to prevent -- it must never block itself.
+        is_connecting = false;
         openNewConnection(session_id);
     };
 
@@ -68,6 +72,10 @@ const BinarySocketBase = (() => {
         otp_override_url = otpUrl;
         close();
         is_switching_socket = true;
+        // Same reasoning as closeAndOpenNewConnection above: this is the
+        // deliberate OTP-authenticated connection itself -- it must always
+        // be allowed to proceed, never blocked by its own guard.
+        is_connecting = false;
         openNewConnection();
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Timed out connecting to OTP-authenticated URL')), 15000);
@@ -106,7 +114,28 @@ const BinarySocketBase = (() => {
     // authentication headers are needed").
     let otp_override_url = null;
 
+    // ROOT CAUSE of "WebSocket is closed before the connection is
+    // established" reintroducing the login modal after a successful OTP
+    // connect (traced 2026-08-09): network_monitor_base.js calls
+    // BinarySocket.openNewConnection() directly -- bypassing this file's
+    // own is_switching_socket flag entirely -- on the browser's 'online'
+    // event and on a 500ms-delayed reconnect check. Neither knows or
+    // cares whether an OTP-authenticated connection is already being
+    // established. If either fires while connectToOtpUrl()'s own
+    // close()+openNewConnection() sequence is mid-flight (a real
+    // possibility on mobile, where brief connectivity blips are common,
+    // and coincidentally close in timing to the ~500ms OTP REST fetch),
+    // two overlapping `new WebSocket()` calls race each other and one
+    // gets aborted mid-handshake. This guard makes openNewConnection()
+    // a no-op while a previous call's connection attempt hasn't finished
+    // opening yet, regardless of which caller triggered either one --
+    // a connection attempt already in flight should never be interrupted
+    // by another one starting, whatever the reason.
+    let is_connecting = false;
+
     const openNewConnection = () => {
+        if (is_connecting) return;
+
         const mock_server_config = getMockServerConfig();
         const session_id = mock_server_config?.session_id || '';
 
@@ -114,6 +143,7 @@ const BinarySocketBase = (() => {
 
         if (isClose()) {
             is_disconnect_called = false;
+            is_connecting = true;
             binary_socket = new WebSocket(otp_override_url || getSocketUrl(session_id));
 
             deriv_api = new DerivAPIBasic({
@@ -124,6 +154,7 @@ const BinarySocketBase = (() => {
         }
 
         deriv_api.onOpen().subscribe(() => {
+            is_connecting = false;
             config.wsEvent('open');
 
             if (!otp_override_url && client_store.is_logged_in) {
@@ -156,6 +187,12 @@ const BinarySocketBase = (() => {
         });
 
         deriv_api.onClose().subscribe(() => {
+            // A connection attempt that closes before opening (aborted,
+            // rejected, or a genuine failure) must clear this too --
+            // otherwise a single failed attempt would permanently block
+            // every future connection, including legitimate retries.
+            is_connecting = false;
+
             if (!is_switching_socket) {
                 config.wsEvent('close');
             } else {
