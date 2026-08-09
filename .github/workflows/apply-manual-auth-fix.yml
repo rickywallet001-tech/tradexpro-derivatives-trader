@@ -1,0 +1,70 @@
+name: Apply Manual Trader auth repair
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply targeted source changes
+        shell: python
+        run: |
+          from pathlib import Path
+          client = Path('packages/core/src/Stores/client-store.js')
+          socket = Path('packages/core/src/_common/base/socket_base.js')
+          c = client.read_text()
+          s = socket.read_text()
+          replacements = [
+              ("    is_authorize = false;\n", "    is_authorize = false;\n    is_otp_authenticated = false;\n    otp_access_token = null;\n"),
+              ("            is_authorize: observable,\n", "            is_authorize: observable,\n            is_otp_authenticated: observable,\n"),
+              ("    get is_logged_in() {\n        const hasSessionToken = !!this.getStoredSessionToken();\n        const hasCurrentAccountLoginId = !!this.current_account?.loginid;\n        const hasLoginId = !!this.loginid;\n        return hasSessionToken && hasCurrentAccountLoginId && hasLoginId;\n    }\n", "    get is_logged_in() {\n        const hasSessionToken = !!this.getStoredSessionToken();\n        const hasAuthenticatedOtpSession = this.is_otp_authenticated;\n        const hasCurrentAccountLoginId = !!this.current_account?.loginid;\n        const hasLoginId = !!this.loginid;\n        return (hasSessionToken || hasAuthenticatedOtpSession) && hasCurrentAccountLoginId && hasLoginId;\n    }\n"),
+              ("    setIsAuthorize(value) {\n        this.is_authorize = value;\n    }\n", "    setIsAuthorize(value) {\n        this.is_authorize = value;\n    }\n\n    async reconnectOtp() {\n        if (!this.otp_access_token) return false;\n        const response = await this.authenticateV2(this.otp_access_token);\n        return !response?.error;\n    }\n"),
+              ("        this.loginid = null;\n        this.user_id = null;\n        this.current_account = null;\n", "        this.loginid = null;\n        this.user_id = null;\n        this.current_account = null;\n        this.setIsAuthorize(false);\n        this.is_otp_authenticated = false;\n        this.otp_access_token = null;\n"),
+              ("                    const storedAccounts = JSON.parse(localStorage.getItem('client.accounts') || '[]');\n                    accountMeta = storedAccounts.find(a => a.account === accountId) || {};\n", "                    const storedAccounts = JSON.parse(localStorage.getItem('client.accounts') || '{}');\n                    accountMeta = Array.isArray(storedAccounts)\n                        ? storedAccounts.find(a => a.account === accountId) || {}\n                        : storedAccounts?.[accountId] || {};\n"),
+              ("                const authorizeResponse = {\n                    authorize: {\n", "                this.otp_access_token = oneTimeToken;\n                this.is_otp_authenticated = true;\n\n                const authorizeResponse = {\n                    authorize: {\n"),
+          ]
+          for old, new in replacements:
+              n = c.count(old)
+              if n != 1:
+                  raise SystemExit(f'client-store anchor expected once, found {n}: {old[:80]!r}')
+              c = c.replace(old, new)
+          old = "    const close = () => {\n        binary_socket.close();\n    };\n"
+          new = "    const close = () => {\n        if (binary_socket) {\n            try { binary_socket.close(); } catch (e) { /* already closing */ }\n        }\n    };\n"
+          if s.count(old) != 1: raise SystemExit('socket close anchor mismatch')
+          s = s.replace(old, new)
+          old = "    const connectToOtpUrl = otpUrl => {\n        otp_override_url = otpUrl;\n        close();\n        is_switching_socket = true;\n        openNewConnection();\n        return new Promise((resolve, reject) => {\n            const timeout = setTimeout(() => reject(new Error('Timed out connecting to OTP-authenticated URL')), 15000);\n            deriv_api.onOpen().subscribe(() => {\n                clearTimeout(timeout);\n                resolve();\n            });\n        });\n    };\n"
+          new = "    const connectToOtpUrl = otpUrl => new Promise((resolve, reject) => {\n        if (!otpUrl) { reject(new Error('Missing OTP-authenticated WebSocket URL')); return; }\n        const previous_socket = binary_socket;\n        is_switching_socket = true;\n        if (previous_socket) { try { previous_socket.close(); } catch (e) {} }\n        otp_override_url = otpUrl;\n        binary_socket = null;\n        deriv_api = null;\n        openNewConnection();\n        const socket = binary_socket;\n        if (!socket) { otp_override_url = null; reject(new Error('Failed to create OTP-authenticated WebSocket')); return; }\n        let settled = false;\n        const finish = (error = null) => {\n            if (settled) return;\n            settled = true;\n            clearTimeout(timeout);\n            socket.removeEventListener('open', on_open);\n            socket.removeEventListener('error', on_error);\n            socket.removeEventListener('close', on_close);\n            otp_override_url = null;\n            if (error) reject(error); else resolve();\n        };\n        const on_open = () => finish();\n        const on_error = () => finish(new Error('OTP-authenticated WebSocket connection failed'));\n        const on_close = () => finish(new Error('OTP-authenticated WebSocket closed before it was established'));\n        const timeout = setTimeout(() => finish(new Error('Timed out connecting to OTP-authenticated URL')), 15000);\n        socket.addEventListener('open', on_open, { once: true });\n        socket.addEventListener('error', on_error, { once: true });\n        socket.addEventListener('close', on_close, { once: true });\n    });\n"
+          if s.count(old) != 1: raise SystemExit('connectToOtpUrl anchor mismatch')
+          s = s.replace(old, new)
+          old = "    const openNewConnection = () => {\n        const mock_server_config = getMockServerConfig();\n"
+          new = "    const openNewConnection = () => {\n        if (!otp_override_url && client_store?.is_otp_authenticated && client_store?.reconnectOtp) {\n            client_store.reconnectOtp().catch(error => console.error('[socket_base] OTP reconnect failed:', error));\n            return;\n        }\n        const mock_server_config = getMockServerConfig();\n"
+          if s.count(old) != 1: raise SystemExit('openNewConnection anchor mismatch')
+          s = s.replace(old, new)
+          client.write_text(c)
+          socket.write_text(s)
+      - name: Verify and commit
+        run: |
+          git diff --check
+          npm ci --strict-peer-deps --verbose
+          npm run build --workspace=@deriv/core
+          git config user.name 'TradeXpro Repair Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add packages/core/src/Stores/client-store.js packages/core/src/_common/base/socket_base.js
+          git commit -m 'fix: repair OAuth OTP authentication lifecycle for Manual Trader'
+          rm -f .github/workflows/apply-manual-auth-fix.yml
+          git add .github/workflows/apply-manual-auth-fix.yml
+          git commit -m 'chore: remove temporary manual auth repair workflow'
+          git push origin master
