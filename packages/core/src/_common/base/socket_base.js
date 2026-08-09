@@ -40,6 +40,29 @@ const BinarySocketBase = (() => {
     const blockRequest = value => deriv_api?.blockRequest(value);
 
     const close = () => {
+        // ROOT CAUSE (confirmed 2026-08-09, with a second-opinion assist from
+        // three independent AI reviews that all converged on this exact gap):
+        // this call was unconditional -- binary_socket.close() regardless of
+        // readyState. The is_connecting guard added earlier only prevents
+        // overlapping *creates*; it does nothing to protect a socket that's
+        // still CONNECTING from being closed out from under itself. If the
+        // app's original boot-time classic connection (opened for public tick
+        // data before login) hasn't finished its handshake yet by the time
+        // connectToOtpUrl() runs -- entirely plausible, since the OTP REST
+        // fetch and that handshake are racing from page load -- calling
+        // .close() on it mid-handshake is exactly what produces "WebSocket is
+        // closed before the connection is established" for that exact URL,
+        // every time. It was never a second/duplicate connection attempt;
+        // it was this app's own code aborting its own first one too early.
+        //
+        // Fix: if the socket is still CONNECTING, don't abort it -- let it
+        // finish opening (or fail) on its own, then close it immediately
+        // once it does, via a one-time listener. This releases the same
+        // resource without ever calling close() on a CONNECTING socket.
+        if (binary_socket.readyState === WebSocket.CONNECTING) {
+            binary_socket.addEventListener('open', () => binary_socket.close(), { once: true });
+            return;
+        }
         binary_socket.close();
     };
 
