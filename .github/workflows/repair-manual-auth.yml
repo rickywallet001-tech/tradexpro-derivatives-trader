@@ -1,11 +1,13 @@
 name: Targeted Manual Trader auth repair
 
-# Triggered deliberately after review so the surgical source patch is applied and build-tested before merge.
+# Temporary, surgical repair workflow. It applies only the reviewed auth/socket patch,
+# runs the core build, then removes itself after a successful source commit.
 
 on:
   push:
     branches:
       - fix/manual-trader-auth-otp
+      - master
 
 permissions:
   contents: write
@@ -108,4 +110,4 @@ jobs:
           rm -f .github/workflows/repair-manual-auth.yml
           git add packages/core/src/Stores/client-store.js packages/core/src/_common/base/socket_base.js .github/workflows/repair-manual-auth.yml
           git commit -m "fix: complete OAuth OTP authentication lifecycle for Manual Traders"
-          git push origin HEAD:fix/manual-trader-auth-otp
+          git push origin HEAD:${GITHUB_REF_NAME}
