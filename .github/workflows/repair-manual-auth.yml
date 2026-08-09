@@ -1,5 +1,7 @@
 name: Targeted Manual Trader auth repair
 
+# Triggered deliberately after review so the surgical source patch is applied and build-tested before merge.
+
 on:
   push:
     branches:
