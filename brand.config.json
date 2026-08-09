@@ -10,8 +10,8 @@
         "name": "Derivatives Trader",
         "logo": "IcRebrandingDerivTrader",
         "hostname": {
-            "staging": "staging-dtrader.deriv.com",
-            "production": "dtrader.deriv.com"
+            "staging": "m.tradexpro.co.ke",
+            "production": "m.tradexpro.co.ke"
         }
     },
     "colors": {
