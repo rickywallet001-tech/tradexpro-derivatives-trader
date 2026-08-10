@@ -1,0 +1,84 @@
+name: Repair OTP blank-screen regression
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Restore clean pre-regression client store and reapply OTP auth patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          path = Path('packages/core/src/Stores/client-store.js')
+          clean = subprocess.check_output([
+              'git', 'show', '754668045d3a3ffd049f4c294ea18a183f2e0c57:packages/core/src/Stores/client-store.js'
+          ], text=True)
+          text = clean
+
+          replacements = [
+              (
+                  "    is_authorize = false;\n",
+                  "    is_authorize = false;\n    // True when the current WebSocket was authenticated through Deriv's\n    // OAuth/Options OTP flow. This is deliberately separate from the\n    // legacy session_token flag: the OTP token must never be passed to\n    // the classic authorize() request.\n    is_otp_authenticated = false;\n    otp_access_token = null;\n",
+              ),
+              (
+                  "            is_authorize: observable,\n",
+                  "            is_authorize: observable,\n            is_otp_authenticated: observable,\n",
+              ),
+              (
+                  "        return hasSessionToken && hasCurrentAccountLoginId && hasLoginId;\n",
+                  "        // An OTP-authenticated WebSocket is already authenticated at\n        // connection level. Requiring the legacy session_token here makes\n        // every successful OTP login look logged out to trade-store.ts and\n        // reopens the 'Start trading with us' modal on Buy.\n        return (hasSessionToken || this.is_otp_authenticated) && hasCurrentAccountLoginId && hasLoginId;\n",
+              ),
+              (
+                  "                const authorizeResponse = {\n                    authorize: {\n",
+                  "                // The OTP URL itself authenticates the WebSocket; there is\n                // intentionally no legacy authorize(token) call. Remember the\n                // OAuth token only so a future OTP reconnect can request a fresh\n                // one-use URL instead of treating this token as a session_token.\n                this.otp_access_token = oneTimeToken;\n                this.is_otp_authenticated = true;\n\n                const authorizeResponse = {\n                    authorize: {\n",
+              ),
+              (
+                  "        this.current_account = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
+                  "        this.current_account = null;\n        this.setIsAuthorize(false);\n        this.is_otp_authenticated = false;\n        this.otp_access_token = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match ({count}) for anchor: {old[:100]!r}; found {count}')
+              text = text.replace(old, new)
+
+          path.write_text(text)
+          print('Restored client-store from known-good pre-regression commit and reapplied the intended OTP auth-state fix.')
+
+      - name: Verify and build
+        run: |
+          git diff --check
+          npm ci --strict-peer-deps --verbose
+          npm run build --workspace=@deriv/core
+
+      - name: Commit repaired source and remove workflow
+        run: |
+          git config user.name "TradeXpro Repair Bot"
+          git config user.email "actions@users.noreply.github.com"
+          rm -f .github/workflows/repair-otp-blank-regression.yml
+          git add packages/core/src/Stores/client-store.js .github/workflows/repair-otp-blank-regression.yml
+          git commit -m "fix: restore Manual Trader auth state without blank-screen regression"
+          git push origin master
