@@ -37,8 +37,10 @@ const BottomWidgetsMobile = ({ tick, digits, setTick, setDigits }: TBottomWidget
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [digits]);
 
-    // render nothing for bottom widgets on chart in mobile
-    return null;
+    // Render the same DigitsWidget used by the desktop SmartChart bottom widget.
+    // Mobile previously returned null here, which removed the digit-probability
+    // strip from the chart entirely.
+    return <DigitsWidget digits={digits} tick={tick} />;
 };
 
 const Trade = observer(() => {
@@ -241,7 +243,6 @@ const Trade = observer(() => {
                                 onChange={onChangeSwipeableIndex}
                                 should_elevate_navigation={should_elevate_navigation}
                             >
-                                {show_digits_stats && <DigitsWidget digits={digits} tick={tick} />}
                                 <TradeChart
                                     bottomWidgets={show_digits_stats ? bottomWidgets : undefined}
                                     has_barrier={has_barrier}
@@ -276,7 +277,7 @@ const Trade = observer(() => {
                             is_eu={is_eu}
                             is_synthetics_trading_market_available={is_synthetics_trading_market_available}
                             onClick={onTryOtherMarkets}
-                            onMarketOpen={prepareTradeStore}
+                            onMarketOpen={onMarketOpen}
                             symbol={symbol}
                         />
                     )}
