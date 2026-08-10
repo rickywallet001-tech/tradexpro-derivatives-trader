@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - fix/manual-trader-otp-auth-state
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -12,10 +14,11 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout head branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -75,4 +78,4 @@ jobs:
           rm -f .github/workflows/apply-otp-auth-state-fix.yml
           git add packages/core/src/Stores/client-store.js .github/workflows/apply-otp-auth-state-fix.yml
           git commit -m "fix: treat OTP-authenticated Manual Trader session as logged in"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git push origin HEAD:${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}
