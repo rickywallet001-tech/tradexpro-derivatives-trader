@@ -126,10 +126,6 @@ const Trade = observer(() => {
     }, [onMount, onUnmount, getFirstOpenMarket, is_synthetics_available]);
 
     React.useEffect(() => {
-        if (isMobile) {
-            // The digit data is now consumed directly by the mobile chart
-            // bottom widget, so no duplicate local copy is required here.
-        }
         setTrySyntheticIndices(false);
         setTryOpenMarkets(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
