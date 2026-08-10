@@ -277,7 +277,7 @@ const Trade = observer(() => {
                             is_eu={is_eu}
                             is_synthetics_trading_market_available={is_synthetics_trading_market_available}
                             onClick={onTryOtherMarkets}
-                            onMarketOpen={onMarketOpen}
+                            onMarketOpen={prepareTradeStore}
                             symbol={symbol}
                         />
                     )}
