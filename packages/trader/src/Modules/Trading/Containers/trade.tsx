@@ -21,27 +21,6 @@ export type TBottomWidgetsParams = {
     digits: number[];
     tick: TickSpotData | null;
 };
-type TBottomWidgetsMobile = TBottomWidgetsParams & {
-    setTick: (tick: TickSpotData | null) => void;
-    setDigits: (digits: number[]) => void;
-};
-
-const BottomWidgetsMobile = ({ tick, digits, setTick, setDigits }: TBottomWidgetsMobile) => {
-    React.useEffect(() => {
-        setTick(tick);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tick]);
-
-    React.useEffect(() => {
-        setDigits(digits);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [digits]);
-
-    // Render the same DigitsWidget used by the desktop SmartChart bottom widget.
-    // Mobile previously returned null here, which removed the digit-probability
-    // strip from the chart entirely.
-    return <DigitsWidget digits={digits} tick={tick} />;
-};
 
 const Trade = observer(() => {
     const { client, common, ui } = useStore();
@@ -73,8 +52,6 @@ const Trade = observer(() => {
     const { network_status } = common;
     const { isDesktop, isMobile, isTabletPortrait } = useDevice();
 
-    const [digits, setDigits] = React.useState<number[]>([]);
-    const [tick, setTick] = React.useState<null | TickSpotData>(null);
     const [try_synthetic_indices, setTrySyntheticIndices] = React.useState(false);
     const [try_open_markets, setTryOpenMarkets] = React.useState(false);
     const [category, setCategory] = React.useState<string>();
@@ -150,15 +127,19 @@ const Trade = observer(() => {
 
     React.useEffect(() => {
         if (isMobile) {
-            setDigits([]);
+            // The digit data is now consumed directly by the mobile chart
+            // bottom widget, so no duplicate local copy is required here.
         }
         setTrySyntheticIndices(false);
         setTryOpenMarkets(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [symbol, setDigits, setTrySyntheticIndices, is_synthetics_available]);
+    }, [symbol, setTrySyntheticIndices, is_synthetics_available]);
 
-    const bottomWidgets = React.useCallback(({ digits: d, tick: t }: TBottomWidgetsParams) => {
-        return <BottomWidgetsMobile digits={d} tick={t} setTick={setTick} setDigits={setDigits} />;
+    const bottomWidgets = React.useCallback(({ digits, tick }: TBottomWidgetsParams) => {
+        // Use the exact same DigitsWidget component that desktop renders in
+        // SmartChart's bottom widget. The previous mobile implementation
+        // returned null, which is why the digit strip disappeared on mobile.
+        return <DigitsWidget digits={digits} tick={tick} />;
     }, []);
 
     const onChangeSwipeableIndex = (index?: number) => {
