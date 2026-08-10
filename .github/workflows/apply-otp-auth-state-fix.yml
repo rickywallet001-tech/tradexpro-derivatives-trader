@@ -1,0 +1,81 @@
+name: Apply OTP auth-state fix
+
+on:
+  push:
+    branches:
+      - fix/manual-trader-otp-auth-state
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout head branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply surgical client-store patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('packages/core/src/Stores/client-store.js')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "    is_authorize = false;\n",
+                  "    is_authorize = false;\n    // True when the current WebSocket was authenticated through Deriv's\n    // OAuth/Options OTP flow. This is deliberately separate from the\n    // legacy session_token flag: the OTP token must never be passed to\n    // the classic authorize() request.\n    is_otp_authenticated = false;\n    otp_access_token = null;\n",
+              ),
+              (
+                  "            is_authorize: observable,\n",
+                  "            is_authorize: observable,\n            is_otp_authenticated: observable,\n",
+              ),
+              (
+                  "        return hasSessionToken && hasCurrentAccountLoginId && hasLoginId;\n",
+                  "        // An OTP-authenticated WebSocket is already authenticated at\n        // connection level. Requiring the legacy session_token here makes\n        // every successful OTP login look logged out to trade-store.ts and\n        // reopens the 'Start trading with us' modal on Buy.\n        return (hasSessionToken || this.is_otp_authenticated) && hasCurrentAccountLoginId && hasLoginId;\n",
+              ),
+              (
+                  "                const authorizeResponse = {\n                    authorize: {\n",
+                  "                // The OTP URL itself authenticates the WebSocket; there is\n                // intentionally no legacy authorize(token) call. Remember the\n                // OAuth token only so a future OTP reconnect can request a fresh\n                // one-use URL instead of treating this token as a session_token.\n                this.otp_access_token = oneTimeToken;\n                this.is_otp_authenticated = true;\n\n                const authorizeResponse = {\n                    authorize: {\n",
+              ),
+              (
+                  "        this.current_account = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
+                  "        this.current_account = null;\n        this.setIsAuthorize(false);\n        this.is_otp_authenticated = false;\n        this.otp_access_token = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match ({count}) for anchor: {old[:100]!r}')
+              text = text.replace(old, new)
+
+          path.write_text(text)
+
+      - name: Verify source and build
+        run: |
+          git diff --check
+          npm ci --strict-peer-deps --verbose
+          npm run build --workspace=@deriv/core
+
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name "TradeXpro Repair Bot"
+          git config user.email "actions@users.noreply.github.com"
+          rm -f .github/workflows/apply-otp-auth-state-fix.yml
+          git add packages/core/src/Stores/client-store.js .github/workflows/apply-otp-auth-state-fix.yml
+          git commit -m "fix: treat OTP-authenticated Manual Trader session as logged in"
+          git push origin HEAD:${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}
