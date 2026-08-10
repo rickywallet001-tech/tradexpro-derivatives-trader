@@ -3,9 +3,7 @@ name: Apply OTP auth-state fix
 on:
   push:
     branches:
-      - fix/manual-trader-otp-auth-state
-  pull_request:
-    types: [opened, synchronize, reopened]
+      - master
 
 permissions:
   contents: write
@@ -14,11 +12,11 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout head branch
+      - name: Checkout master
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: master
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -44,16 +42,24 @@ jobs:
                   "            is_authorize: observable,\n            is_otp_authenticated: observable,\n",
               ),
               (
+                  "            setIsAuthorize: action.bound,\n",
+                  "            setIsAuthorize: action.bound,\n            setIsOtpAuthenticated: action.bound,\n",
+              ),
+              (
+                  "    setIsAuthorize(value) {\n        this.is_authorize = value;\n    }\n",
+                  "    setIsAuthorize(value) {\n        this.is_authorize = value;\n    }\n\n    setIsOtpAuthenticated(value) {\n        this.is_otp_authenticated = value;\n    }\n",
+              ),
+              (
                   "        return hasSessionToken && hasCurrentAccountLoginId && hasLoginId;\n",
                   "        // An OTP-authenticated WebSocket is already authenticated at\n        // connection level. Requiring the legacy session_token here makes\n        // every successful OTP login look logged out to trade-store.ts and\n        // reopens the 'Start trading with us' modal on Buy.\n        return (hasSessionToken || this.is_otp_authenticated) && hasCurrentAccountLoginId && hasLoginId;\n",
               ),
               (
                   "                const authorizeResponse = {\n                    authorize: {\n",
-                  "                // The OTP URL itself authenticates the WebSocket; there is\n                // intentionally no legacy authorize(token) call. Remember the\n                // OAuth token only so a future OTP reconnect can request a fresh\n                // one-use URL instead of treating this token as a session_token.\n                this.otp_access_token = oneTimeToken;\n                this.is_otp_authenticated = true;\n\n                const authorizeResponse = {\n                    authorize: {\n",
+                  "                // The OTP URL itself authenticates the WebSocket; there is\n                // intentionally no legacy authorize(token) call. Remember the\n                // OAuth token only so a future OTP reconnect can request a fresh\n                // one-use URL instead of treating this token as a session_token.\n                this.otp_access_token = oneTimeToken;\n                this.setIsOtpAuthenticated(true);\n\n                const authorizeResponse = {\n                    authorize: {\n",
               ),
               (
                   "        this.current_account = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
-                  "        this.current_account = null;\n        this.setIsAuthorize(false);\n        this.is_otp_authenticated = false;\n        this.otp_access_token = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
+                  "        this.current_account = null;\n        this.setIsAuthorize(false);\n        this.setIsOtpAuthenticated(false);\n        this.otp_access_token = null;\n\n        LocalStore.set('marked_notifications', JSON.stringify([]));\n",
               ),
           ]
 
@@ -78,4 +84,4 @@ jobs:
           rm -f .github/workflows/apply-otp-auth-state-fix.yml
           git add packages/core/src/Stores/client-store.js .github/workflows/apply-otp-auth-state-fix.yml
           git commit -m "fix: treat OTP-authenticated Manual Trader session as logged in"
-          git push origin HEAD:${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}
+          git push origin master
