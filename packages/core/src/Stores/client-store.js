@@ -462,7 +462,14 @@ export default class ClientStore extends BaseStore {
             }
 
             const language = authorize_response.authorize.preferred_language || getInitialLanguage();
-            const stored_language_without_double_quotes = LocalStore.get(LANGUAGE_KEY).replace(/"/g, '');
+            // LocalStore.get(LANGUAGE_KEY) returns undefined on a fresh
+            // domain with no prior localStorage entry for this key (e.g.
+            // this app's first-ever load on a brand new subdomain) --
+            // .replace() on that crashed init() entirely. Optional
+            // chaining preserves the exact same behavior for the "not set
+            // yet" case: stored_language_without_double_quotes stays
+            // falsy, and the existing check below already skips cleanly.
+            const stored_language_without_double_quotes = LocalStore.get(LANGUAGE_KEY)?.replace(/"/g, '');
             if (stored_language_without_double_quotes && language !== stored_language_without_double_quotes) {
                 window.history.replaceState({}, document.title, urlForLanguage(language));
                 await this.root_store.common.changeSelectedLanguage(language);
