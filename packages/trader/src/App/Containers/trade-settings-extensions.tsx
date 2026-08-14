@@ -15,10 +15,39 @@ type TTradeSettingsExtensionsProps = {
 
 const ChartSettingContainer = Loadable({
     loader: () =>
-        import(
-            /* webpackChunkName: "settings-chart", webpackPrefetch: true */ 'App/Containers/SettingsModal/settings-chart'
-        ),
-    loading: () => <UILoader />,
+        import(/* webpackChunkName: "settings-chart" */ 'App/Containers/SettingsModal/settings-chart').catch(err => {
+            // This chunk has repeatedly failed to load in production
+            // (503) across multiple redeploys -- removed webpackPrefetch
+            // since a browser-level prefetch hint gains nothing for a
+            // chunk that's this unreliable, and catching here means a
+            // user who actually opens Chart Settings gets a clear error
+            // state via react-loadable's `error` prop instead of an
+            // unhandled rejection.
+            console.error('[TradeSettingsExtensions] settings-chart chunk failed to load', err);
+            throw err;
+        }),
+    loading: ({
+        error,
+        retry,
+        pastDelay,
+    }: {
+        error?: Error | null;
+        retry: () => void;
+        pastDelay: boolean;
+        isLoading: boolean;
+        timedOut: boolean;
+    }) => {
+        if (error) {
+            return (
+                <div style={{ padding: 16, textAlign: 'center' }}>
+                    <p>{"Couldn't load chart settings."}</p>
+                    <button onClick={retry}>Retry</button>
+                </div>
+            );
+        }
+        if (pastDelay) return <UILoader />;
+        return null;
+    },
 });
 
 const renderItemValue = <T extends object>(props: T, store: TCoreStores) => (
