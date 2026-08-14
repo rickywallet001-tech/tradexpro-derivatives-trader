@@ -22,6 +22,13 @@ type QueryOptions = {
 const cache: Record<string, any> = {};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ongoing_requests: Record<string, Promise<any> | undefined> = {};
+// Tracks retry attempts per query key. This request previously had zero
+// resilience against any transient failure (a rate limit, a slow/stuck
+// authorize(), a network blip) -- one timeout permanently surfaced a
+// dead-end error card with no automatic recovery, only a manual refresh.
+const retry_attempts: Record<string, number> = {};
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000; // 2s, 4s, 6s
 
 const getKey = (keys: string | string[]) => (Array.isArray(keys) ? keys.join('-') : keys);
 
@@ -73,6 +80,7 @@ export const useDtraderQuery = <Response>(
             ?.then((result: Response) => {
                 if (!is_mounted.current) return;
 
+                retry_attempts[key] = 0;
                 cache[key] = result;
                 setData(result);
                 setIsFetching(false);
@@ -80,6 +88,17 @@ export const useDtraderQuery = <Response>(
             .catch((err: TServerError | Error) => {
                 if (!is_mounted.current) return;
 
+                const attempts = retry_attempts[key] ?? 0;
+                if (attempts < MAX_RETRIES) {
+                    retry_attempts[key] = attempts + 1;
+                    const delay = RETRY_DELAY_MS * (attempts + 1);
+                    setTimeout(() => {
+                        if (is_mounted.current) fetchData();
+                    }, delay);
+                    return;
+                }
+
+                retry_attempts[key] = 0;
                 setData(null);
                 setError(err as TServerError);
                 setIsFetching(false);
